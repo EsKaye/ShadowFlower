@@ -58,9 +58,10 @@ ShadowFlower is currently a development scaffold with the following characterist
 ### Core Components
 
 - **Provider Abstraction**: Swappable AI providers (Gemini, etc.)
-- **GameDin Client**: HTTP wrapper for GameDin API integration
-- **Moderation Pipeline**: Batch processing and job management
-- **Security Layer**: Authentication and request validation
+- **GameDin Client**: HTTP wrapper for GameDin API integration with HMAC signing
+- **Moderation Pipeline**: Batch processing with job locking and idempotency
+- **Security Layer**: Authentication, HMAC verification, rate limiting
+- **Infrastructure**: Upstash Redis for distributed coordination
 - **API Routes**: RESTful endpoints for health checks and job execution
 
 ### Directory Structure
@@ -68,13 +69,33 @@ ShadowFlower is currently a development scaffold with the following characterist
 ```
 src/
   config/          # Environment and service configuration
+  infrastructure/  # Upstash Redis wrapper for distributed coordination
   lib/             # GameDin client and utilities
   providers/       # AI provider implementations
   jobs/            # Moderation job pipeline
   routes/          # API endpoints
-  security/        # Authentication and middleware
+  security/        # Authentication, HMAC signing, audit logging
   types/           # TypeScript type definitions
 ```
+
+### Infrastructure
+
+ShadowFlower uses the following infrastructure:
+
+- **Runtime**: Vercel serverless functions
+- **Persistent Coordination**: Upstash Redis for distributed rate limiting, replay protection, job locking, and idempotency
+- **Logging**: Vercel Runtime Logs with structured JSON output
+- **GameDin Integration**: HTTPS with HMAC-SHA256 signing for privileged requests
+- **Scheduler Support**: Scheduler-agnostic job execution (supports Vercel cron, QStash, or manual triggers)
+
+### Degradation When Redis Unavailable
+
+If Upstash Redis is not configured or becomes unavailable, the following protections degrade gracefully:
+
+- **Rate Limiting**: Falls back to in-memory rate limiting (per-function-instance only)
+- **Replay Protection**: Falls back to timestamp-only validation (no nonce tracking)
+- **Job Locking**: Allows concurrent job execution (no distributed lock)
+- **Idempotency**: No idempotency checks (repeated requests execute fully)
 
 ## API Endpoints
 
@@ -88,6 +109,7 @@ All protected endpoints require `x-shadowflower-api-key` header.
 
 - `POST /api/jobs/moderation/run` - Execute moderation job (sends results to GameDin)
 - `POST /api/jobs/moderation/dry-run` - Execute moderation job in dry-run mode
+- `POST /api/jobs/moderation/schedule` - Scheduler-triggered moderation job (supports Vercel cron, QStash, or manual triggers)
 
 ### Admin Endpoints
 
@@ -95,20 +117,68 @@ Admin endpoints require `x-shadowflower-admin-key` header. If the key is invalid
 
 - No admin endpoints currently implemented (reserved for future use)
 
+### Scheduler Integration
+
+ShadowFlower supports scheduler-agnostic job execution through the `/api/jobs/moderation/schedule` endpoint:
+
+- **Vercel Cron**: Can be triggered daily via Vercel cron jobs (Hobby plan limited to once per day)
+- **External Schedulers**: Can be triggered hourly by external schedulers like QStash
+- **Manual Execution**: Can be triggered manually with API authentication
+
+The scheduler endpoint supports:
+- Idempotency keys to prevent duplicate executions
+- Optional lock skipping for manual execution
+- Scheduler ID tracking for observability
+
 ## Security Hardening
 
-ShadowFlower has undergone a security hardening pass to improve its security posture. The following measures have been implemented:
+ShadowFlower has undergone comprehensive security hardening with the following measures:
 
 ### Route Classification
 
 All routes are explicitly classified by access level:
 
 - **Public**: `/api/health` - Minimal operational status only
-- **Protected**: `/api/jobs/moderation/run`, `/api/jobs/moderation/dry-run` - Require `SHADOWFLOWER_API_KEY`
-- **Admin**: Reserved for future admin endpoints - Require `SHADOWFLOWER_ADMIN_KEY`
-- **Root**: `/` - Returns 404 to avoid information disclosure
+- **Protected**: `/api/jobs/moderation/run`, `/api/jobs/moderation/dry-run`, `/api/jobs/moderation/schedule` - Require `SHADOWFLOWER_API_KEY`
+- **Admin**: Reserved endpoints - Require `SHADOWFLOWER_ADMIN_KEY` (returns 404 if invalid)
 
-See `src/security/route-policy.ts` for the central route policy.
+### HMAC Signature Verification
+
+ShadowFlower supports HMAC-SHA256 signature verification for enhanced inter-service security:
+
+- **Optional**: Only active when `SHADOWFLOWER_SIGNING_SECRET` is configured
+- **Headers Required**: `x-shadowflower-timestamp`, `x-shadowflower-nonce`, `x-shadowflower-signature`
+- **Replay Protection**: Nonces tracked in Upstash Redis with 5-minute TTL
+- **Timestamp Validation**: Rejects requests with timestamps outside 5-minute window
+- **Degrades Gracefully**: Falls back to API key-only auth if Redis unavailable
+
+### Distributed Rate Limiting
+
+ShadowFlower uses Upstash Redis for production-grade distributed rate limiting:
+
+- **Scope**: Per-IP rate limiting across all function instances
+- **Fallback**: In-memory rate limiting if Redis unavailable (per-instance only)
+- **Configurable**: Window size and request limits per endpoint
+- **Audit Logging**: All rate limit violations logged with request context
+
+### Job Locking and Idempotency
+
+ShadowFlower uses Redis for job coordination:
+
+- **Distributed Locks**: Prevents concurrent moderation job execution
+- **Idempotency Keys**: Cache job results to prevent duplicate processing
+- **Lock TTL**: 5-minute lock timeout with automatic release
+- **Safe Fallback**: Allows concurrent execution if Redis unavailable
+
+### GameDin Integration Security
+
+All privileged requests to GameDin use enhanced security:
+
+- **HTTPS Only**: All GameDin communication over HTTPS
+- **HMAC Signing**: Optional HMAC-SHA256 signing for privileged requests
+- **Server-to-Server**: Uses dedicated inter-service API keys
+- **Timeout Handling**: Configurable timeouts with proper error handling
+- **No Direct DB Access**: All data access through GameDin API only
 
 ### Authentication and Authorization
 

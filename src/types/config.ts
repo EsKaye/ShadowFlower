@@ -9,6 +9,9 @@ export interface EnvironmentConfig {
   geminiApiKey?: string;
   nodeEnv: 'development' | 'production';
   port?: number;
+  upstashRedisRestUrl?: string;
+  upstashRedisRestToken?: string;
+  gamedinSigningSecret?: string;
 }
 
 export interface ModerationConfig {

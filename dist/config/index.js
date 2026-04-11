@@ -32,6 +32,15 @@ function getEnvironmentConfig() {
     if (process.env['PORT']) {
         config.port = parseInt(process.env['PORT'], 10);
     }
+    if (process.env['UPSTASH_REDIS_REST_URL']) {
+        config.upstashRedisRestUrl = process.env['UPSTASH_REDIS_REST_URL'];
+    }
+    if (process.env['UPSTASH_REDIS_REST_TOKEN']) {
+        config.upstashRedisRestToken = process.env['UPSTASH_REDIS_REST_TOKEN'];
+    }
+    if (process.env['GAMEDIN_SIGNING_SECRET']) {
+        config.gamedinSigningSecret = process.env['GAMEDIN_SIGNING_SECRET'];
+    }
     // Validate required environment variables
     const requiredVars = ['gamedinBaseUrl', 'shadowflowerApiKey', 'gamedinShadowflowerApiKey'];
     const missingVars = requiredVars.filter(varName => !config[varName]);
@@ -66,6 +75,18 @@ function getEnvironmentConfig() {
     if (process.env['SHADOWFLOWER_ADMIN_KEY']) {
         try {
             validateSecretStrength(process.env['SHADOWFLOWER_ADMIN_KEY'], 'SHADOWFLOWER_ADMIN_KEY');
+        }
+        catch (error) {
+            if (process.env['NODE_ENV'] === 'production') {
+                throw error;
+            }
+            console.warn(`Secret validation warning: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    // Validate optional Gamedin signing secret if configured
+    if (process.env['GAMEDIN_SIGNING_SECRET']) {
+        try {
+            validateSecretStrength(process.env['GAMEDIN_SIGNING_SECRET'], 'GAMEDIN_SIGNING_SECRET');
         }
         catch (error) {
             if (process.env['NODE_ENV'] === 'production') {

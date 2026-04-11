@@ -8,6 +8,8 @@ export interface ModerationJobOptions {
     batchSize?: number;
     provider?: string;
     model?: string;
+    idempotencyKey?: string;
+    skipLock?: boolean;
 }
 export declare class ModerationPipeline {
     private gamedinClient;

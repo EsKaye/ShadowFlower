@@ -19,6 +19,7 @@ import {
   extractSignatureHeaders,
   type SigningConfig,
 } from './signing';
+import { getRedisService } from '../infrastructure/redis';
 
 export interface AuthenticatedRequest extends VercelRequest {
   authenticated?: boolean;
@@ -152,7 +153,7 @@ export function requireAuth(
 /**
  * Rate limiting middleware (simple in-memory implementation)
  * NOTE: This is a lightweight/dev-grade rate limiter that resets on function restart
- * For production-grade rate limiting, use a distributed rate limiter with persistent storage
+ * For production-grade rate limiting, use distributedRateLimit with Redis
  */
 export function rateLimit(options: {
   windowMs: number;
@@ -195,6 +196,51 @@ export function rateLimit(options: {
 
     clientRequests.count++;
     next();
+  };
+}
+
+/**
+ * Distributed rate limiting middleware using Redis
+ * Provides production-grade rate limiting across function instances
+ * Falls back to allowing requests if Redis is unavailable
+ */
+export function distributedRateLimit(options: {
+  windowMs: number;
+  maxRequests: number;
+}) {
+  return async (req: AuthenticatedRequest, res: VercelResponse, next: () => void): Promise<void> => {
+    const clientId = req.headers['x-forwarded-for'] as string ||
+                     req.headers['x-real-ip'] as string ||
+                     'unknown';
+
+    const requestId = req.requestId || generateRequestId();
+    const redis = getRedisService();
+
+    try {
+      const result = await redis.rateLimit(clientId, options.maxRequests, options.windowMs);
+
+      if (!result.allowed) {
+        if (req.url) {
+          logRateLimitExceeded({ requestId, clientId, route: req.url });
+        } else {
+          logRateLimitExceeded({ requestId, clientId });
+        }
+        res.status(429).json({
+          error: 'Too Many Requests',
+          message: 'Rate limit exceeded',
+          timestamp: new Date().toISOString(),
+          requestId,
+          resetTime: result.resetTime,
+        });
+        return;
+      }
+
+      next();
+    } catch (error) {
+      // If Redis fails, allow request but log the error
+      console.error('[RateLimit] Redis error, allowing request:', error);
+      next();
+    }
   };
 }
 
@@ -341,7 +387,7 @@ export function requireSignature(
       maxTimestampDelta: 5 * 60 * 1000, // 5 minutes
     };
 
-    const verification = verifySignature(signingConfig, {
+    const verification = await verifySignature(signingConfig, {
       method: req.method || 'GET',
       path: req.url || '/',
       body,

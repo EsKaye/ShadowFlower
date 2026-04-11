@@ -1,7 +1,9 @@
 /**
  * GameDin client wrapper for HTTP integration
+ * Uses HMAC signing for privileged server-to-server requests
  */
 import axios from 'axios';
+import { signRequest } from '../security/signing';
 export class GameDinClient {
     client;
     config;
@@ -41,10 +43,21 @@ export class GameDinClient {
     }
     /**
      * Send moderation advisory results back to GameDin
+     * Uses HMAC signing if signing secret is configured
      */
     async sendAdvisoryResults(payload) {
         try {
-            await this.client.post('/api/internal/moderation/advisory', payload);
+            const headers = {
+                ...this.getAuthHeaders(),
+            };
+            // Add HMAC signature if signing secret is configured
+            if (this.config.signingSecret) {
+                const signatureHeaders = this.signRequest('POST', '/api/internal/moderation/advisory', payload);
+                Object.entries(signatureHeaders).forEach(([key, value]) => {
+                    headers[key] = value;
+                });
+            }
+            await this.client.post('/api/internal/moderation/advisory', payload, { headers });
         }
         catch (error) {
             throw new Error(`Failed to send advisory results: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -96,6 +109,31 @@ export class GameDinClient {
             'authorization': `Bearer ${this.config.apiKey}`,
             'x-service': 'shadowflower',
             'content-type': 'application/json',
+        };
+    }
+    /**
+     * Sign a request with HMAC-SHA256
+     * Returns signature headers for privileged requests
+     */
+    signRequest(method, path, body) {
+        if (!this.config.signingSecret) {
+            return {};
+        }
+        const signingConfig = {
+            secretKey: this.config.signingSecret,
+            maxTimestampDelta: 5 * 60 * 1000, // 5 minutes
+        };
+        const bodyString = typeof body === 'string' ? body : JSON.stringify(body || {});
+        const signatureHeaders = signRequest(signingConfig, {
+            method,
+            path,
+            body: bodyString,
+        });
+        // Convert SignatureHeaders to Record<string, string>
+        return {
+            'x-shadowflower-timestamp': signatureHeaders['x-shadowflower-timestamp'],
+            'x-shadowflower-nonce': signatureHeaders['x-shadowflower-nonce'],
+            'x-shadowflower-signature': signatureHeaders['x-shadowflower-signature'],
         };
     }
     /**

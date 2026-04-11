@@ -1,9 +1,11 @@
 /**
  * HMAC signing and verification for inter-service requests
  * Provides stronger server-to-server request verification than static API keys alone
+ * Includes Redis-based replay protection for nonce tracking
  */
 
 import crypto from 'crypto';
+import { getRedisService } from '../infrastructure/redis';
 
 export interface SignatureHeaders {
   'x-shadowflower-timestamp': string;
@@ -75,33 +77,42 @@ export function signRequest(config: SigningConfig, params: {
 /**
  * Verify a request signature
  * Returns true if signature is valid and timestamp is within allowed delta
+ * Checks nonce against Redis for replay protection
  */
-export function verifySignature(config: SigningConfig, params: {
+export async function verifySignature(config: SigningConfig, params: {
   method: string;
   path: string;
   body: string;
   headers: SignatureHeaders;
-}): { valid: boolean; reason?: string } {
+}): Promise<{ valid: boolean; reason?: string }> {
   const { method, path, body, headers } = params;
-  
+
   const timestamp = headers['x-shadowflower-timestamp'];
   const nonce = headers['x-shadowflower-nonce'];
   const providedSignature = headers['x-shadowflower-signature'];
-  
+
   // Check all required headers are present
   if (!timestamp || !nonce || !providedSignature) {
     return { valid: false, reason: 'Missing required signature headers' };
   }
-  
+
   // Check timestamp is within allowed delta (replay protection)
   const now = Date.now();
   const requestTime = parseInt(timestamp, 10);
   const timeDelta = Math.abs(now - requestTime);
-  
+
   if (isNaN(requestTime) || timeDelta > config.maxTimestampDelta) {
     return { valid: false, reason: 'Timestamp outside allowed window' };
   }
-  
+
+  // Check nonce for replay protection using Redis
+  const redis = getRedisService();
+  const nonceValid = await redis.verifyNonce(nonce, 300); // 5 minute TTL for nonces
+
+  if (!nonceValid) {
+    return { valid: false, reason: 'Replay detected - nonce already used' };
+  }
+
   // Recreate the signature
   const expectedSignature = createSignature(config, {
     method,
@@ -110,7 +121,7 @@ export function verifySignature(config: SigningConfig, params: {
     nonce,
     body,
   });
-  
+
   // Constant-time comparison to prevent timing attacks
   if (!crypto.timingSafeEqual(
     Buffer.from(expectedSignature),
@@ -118,7 +129,7 @@ export function verifySignature(config: SigningConfig, params: {
   )) {
     return { valid: false, reason: 'Invalid signature' };
   }
-  
+
   return { valid: true };
 }
 

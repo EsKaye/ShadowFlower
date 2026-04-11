@@ -36,12 +36,21 @@ export declare function requireAuth(handler: (req: AuthenticatedRequest, res: Ve
 /**
  * Rate limiting middleware (simple in-memory implementation)
  * NOTE: This is a lightweight/dev-grade rate limiter that resets on function restart
- * For production-grade rate limiting, use a distributed rate limiter with persistent storage
+ * For production-grade rate limiting, use distributedRateLimit with Redis
  */
 export declare function rateLimit(options: {
     windowMs: number;
     maxRequests: number;
 }): (req: AuthenticatedRequest, res: VercelResponse, next: () => void) => void;
+/**
+ * Distributed rate limiting middleware using Redis
+ * Provides production-grade rate limiting across function instances
+ * Falls back to allowing requests if Redis is unavailable
+ */
+export declare function distributedRateLimit(options: {
+    windowMs: number;
+    maxRequests: number;
+}): (req: AuthenticatedRequest, res: VercelResponse, next: () => void) => Promise<void>;
 /**
  * Request logging middleware
  */

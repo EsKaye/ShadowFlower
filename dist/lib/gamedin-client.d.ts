@@ -1,11 +1,13 @@
 /**
  * GameDin client wrapper for HTTP integration
+ * Uses HMAC signing for privileged server-to-server requests
  */
 import { ModerationItem, GameDinModerationQueue, GameDinAdvisoryPayload } from '../types';
 export interface GameDinClientConfig {
     baseUrl: string;
     apiKey: string;
     timeout?: number;
+    signingSecret?: string;
 }
 export declare class GameDinClient {
     private client;
@@ -21,6 +23,7 @@ export declare class GameDinClient {
     }): Promise<GameDinModerationQueue>;
     /**
      * Send moderation advisory results back to GameDin
+     * Uses HMAC signing if signing secret is configured
      */
     sendAdvisoryResults(payload: GameDinAdvisoryPayload): Promise<void>;
     /**
@@ -39,6 +42,11 @@ export declare class GameDinClient {
      * Get authentication headers for server-to-server communication
      */
     private getAuthHeaders;
+    /**
+     * Sign a request with HMAC-SHA256
+     * Returns signature headers for privileged requests
+     */
+    private signRequest;
     /**
      * Update client configuration (useful for testing)
      */

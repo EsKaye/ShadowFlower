@@ -21,12 +21,15 @@ import { GameDinClient } from '../lib/gamedin-client';
 import { providerRegistry } from '../providers';
 import { getConfig } from '../config';
 import { DiscordNotifier } from '../notifications/discord';
+import { getRedisService } from '../infrastructure/redis';
 
 export interface ModerationJobOptions {
   dryRun?: boolean;
   batchSize?: number;
   provider?: string;
   model?: string;
+  idempotencyKey?: string;
+  skipLock?: boolean;
 }
 
 export class ModerationPipeline {
@@ -56,18 +59,51 @@ export class ModerationPipeline {
       batchSize = this.config.moderation.defaultBatchSize,
       provider = this.config.moderation.defaultProvider,
       model = this.config.moderation.defaultModel,
+      idempotencyKey,
+      skipLock = false,
     } = options;
 
-    console.log(`Starting moderation job ${jobId} with provider: ${provider}, model: ${model}, dryRun: ${dryRun}`);
+    const redis = getRedisService();
+    let lockAcquired = false;
+    let lockId: string | undefined;
 
     try {
+      // Check idempotency if key provided
+      if (idempotencyKey) {
+        const idempotencyCheck = await redis.checkIdempotency(idempotencyKey);
+        if (idempotencyCheck.processed && idempotencyCheck.result) {
+          console.log(`[${jobId}] Idempotency check passed - returning cached result`);
+          return JSON.parse(idempotencyCheck.result) as ModerationOutput;
+        }
+      }
+
+      // Acquire job lock if not skipped
+      if (!skipLock) {
+        const lockResult = await redis.acquireLock('moderation:job', 300); // 5 minute lock
+        if (!lockResult.acquired) {
+          throw new Error('Moderation job already in progress - lock held');
+        }
+        lockAcquired = true;
+        lockId = lockResult.lockId;
+        console.log(`[${jobId}] Job lock acquired`);
+      }
+
+      console.log(`[${jobId}] Starting moderation job with provider: ${provider}, model: ${model}, dryRun: ${dryRun}`);
+
       // Fetch moderation items from GameDin
       const queue = await this.gamedinClient.fetchModerationQueue({
         limit: batchSize,
       });
 
       if (queue.items.length === 0) {
-        return this.createEmptyOutput(jobId, startedAt, provider, model, dryRun);
+        const emptyOutput = this.createEmptyOutput(jobId, startedAt, provider, model, dryRun);
+        
+        // Cache result for idempotency
+        if (idempotencyKey) {
+          await redis.markProcessed(idempotencyKey, JSON.stringify(emptyOutput));
+        }
+        
+        return emptyOutput;
       }
 
       // Initialize provider
@@ -96,6 +132,20 @@ export class ModerationPipeline {
       const completedAt = new Date().toISOString();
       const duration = new Date(completedAt).getTime() - new Date(startedAt).getTime();
 
+      const output = {
+        results,
+        summary: this.calculateSummary(results),
+        job: {
+          id: jobId,
+          startedAt,
+          completedAt,
+          duration,
+          provider,
+          model,
+          dryRun,
+        },
+      };
+
       // Send Discord notification for batch completion
       if (this.discordNotifier && !dryRun) {
         const summary = this.calculateSummary(results);
@@ -111,35 +161,34 @@ export class ModerationPipeline {
         });
       }
 
-      return {
-        results,
-        summary: this.calculateSummary(results),
-        job: {
-          id: jobId,
-          startedAt,
-          completedAt,
-          duration,
-          provider,
-          model,
-          dryRun,
-        },
-      };
+      // Cache result for idempotency
+      if (idempotencyKey) {
+        await redis.markProcessed(idempotencyKey, JSON.stringify(output));
+      }
+
+      return output;
 
     } catch (error) {
-      console.error(`Moderation job ${jobId} failed:`, error);
+      console.error(`[${jobId}] Moderation job failed:`, error);
 
       // Send Discord notification for batch failure
       if (this.discordNotifier) {
         await this.discordNotifier.notifyBatchFailed({
           jobId,
           error: error instanceof Error ? error.message : 'Unknown error',
-          itemsProcessed: 0, // Unknown at failure time
+          itemsProcessed: 0,
         }).catch((err) => {
           console.error('Failed to send Discord batch failure notification:', err);
         });
       }
 
       throw error;
+    } finally {
+      // Release lock if acquired
+      if (lockAcquired && lockId) {
+        await redis.releaseLock('moderation:job', lockId);
+        console.log(`[${jobId}] Job lock released`);
+      }
     }
   }
 

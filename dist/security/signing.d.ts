@@ -1,6 +1,7 @@
 /**
  * HMAC signing and verification for inter-service requests
  * Provides stronger server-to-server request verification than static API keys alone
+ * Includes Redis-based replay protection for nonce tracking
  */
 export interface SignatureHeaders {
     'x-shadowflower-timestamp': string;
@@ -37,16 +38,17 @@ export declare function signRequest(config: SigningConfig, params: {
 /**
  * Verify a request signature
  * Returns true if signature is valid and timestamp is within allowed delta
+ * Checks nonce against Redis for replay protection
  */
 export declare function verifySignature(config: SigningConfig, params: {
     method: string;
     path: string;
     body: string;
     headers: SignatureHeaders;
-}): {
+}): Promise<{
     valid: boolean;
     reason?: string;
-};
+}>;
 /**
  * Extract signature headers from request
  */
