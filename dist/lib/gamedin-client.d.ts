@@ -39,12 +39,34 @@ export declare class GameDinClient {
      */
     healthCheck(): Promise<boolean>;
     /**
+     * Handshake with GameDin - fetch reviewable moderation reports
+     * Uses exact GameDin contract: GET /api/private/moderation/reports/reviewable
+     * Empty body for signature calculation
+     */
+    fetchReviewableReports(): Promise<any>;
+    /**
+     * Submit AI review advisory for a specific report
+     * Uses exact GameDin contract: POST /api/private/moderation/reports/:id/ai-review
+     * JSON body must be the exact raw body used for signature calculation
+     */
+    submitAiReview(reportId: string, advisoryData: {
+        aiStatus: string;
+        aiSummary: string;
+        aiReason: string;
+        aiConfidence: number;
+        aiRecommendedAction: string;
+        aiEscalateToAdmin: boolean;
+        aiProvider: string;
+        aiModel: string;
+    }): Promise<void>;
+    /**
      * Get authentication headers for server-to-server communication
      */
     private getAuthHeaders;
     /**
-     * Sign a request with HMAC-SHA256
+     * Sign a request with HMAC-SHA256 using exact GameDin contract
      * Returns signature headers for privileged requests
+     * Uses timestamp:nonce:body format with Base64URL encoding
      */
     private signRequest;
     /**

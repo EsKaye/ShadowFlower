@@ -7,8 +7,19 @@
   },
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/src/routes/api/$1"
+      "source": "/((?!api/).*)",
+      "destination": "/src/routes/index"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
     }
   ]
 }

@@ -11,6 +11,7 @@ export interface EnvironmentConfig {
     upstashRedisRestUrl?: string;
     upstashRedisRestToken?: string;
     gamedinSigningSecret?: string;
+    shadowflowerSigningSecret?: string;
     enableDiscordInteractions?: boolean;
     discordApplicationId?: string;
     discordPublicKey?: string;

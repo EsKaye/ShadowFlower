@@ -292,8 +292,6 @@ export function requireSignature(handler) {
             maxTimestampDelta: 5 * 60 * 1000, // 5 minutes
         };
         const verification = await verifySignature(signingConfig, {
-            method: req.method || 'GET',
-            path: req.url || '/',
             body,
             headers: signatureHeaders,
         });

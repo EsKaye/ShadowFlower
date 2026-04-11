@@ -9,15 +9,22 @@ export default async function handler(_req, res) {
     const startTime = Date.now();
     try {
         const config = getConfig();
-        // Check GameDin connectivity
+        // Check GameDin connectivity using new handshake method
         let gamedinStatus = 'disconnected';
         try {
-            const gamedinClient = new GameDinClient({
+            const clientConfig = {
                 baseUrl: config.environment.gamedinBaseUrl,
                 apiKey: config.environment.gamedinShadowflowerApiKey,
                 timeout: 5000,
-            });
-            gamedinStatus = await gamedinClient.healthCheck() ? 'connected' : 'disconnected';
+            };
+            // Only add signingSecret if it exists
+            if (config.environment.shadowflowerSigningSecret) {
+                clientConfig.signingSecret = config.environment.shadowflowerSigningSecret;
+            }
+            const gamedinClient = new GameDinClient(clientConfig);
+            // Try the new handshake method
+            await gamedinClient.fetchReviewableReports();
+            gamedinStatus = 'connected';
         }
         catch (error) {
             gamedinStatus = 'disconnected';

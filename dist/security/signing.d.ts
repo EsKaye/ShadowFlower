@@ -17,32 +17,30 @@ export interface SigningConfig {
  */
 export declare function generateNonce(): string;
 /**
- * Create HMAC signature for a request
- * Signature covers: method + path + timestamp + nonce + body
+ * Create HMAC signature for a request using exact GameDin contract
+ * Signature format: HMAC-SHA256(SHADOWFLOWER_SIGNING_SECRET, timestamp + ":" + nonce + ":" + body)
+ * Base64URL encoding
  */
 export declare function createSignature(config: SigningConfig, params: {
-    method: string;
-    path: string;
     timestamp: string;
     nonce: string;
     body: string;
 }): string;
 /**
- * Sign a request with timestamp, nonce, and signature
+ * Sign a request with timestamp, nonce, and signature using exact GameDin contract
+ * Timestamp is Unix seconds (not milliseconds)
+ * Body is the exact string to be signed (empty string for GET requests)
  */
 export declare function signRequest(config: SigningConfig, params: {
-    method: string;
-    path: string;
     body: string;
 }): SignatureHeaders;
 /**
- * Verify a request signature
+ * Verify a request signature using exact GameDin contract
  * Returns true if signature is valid and timestamp is within allowed delta
  * Checks nonce against Redis for replay protection
+ * Timestamp is Unix seconds, max delta is 300 seconds
  */
 export declare function verifySignature(config: SigningConfig, params: {
-    method: string;
-    path: string;
     body: string;
     headers: SignatureHeaders;
 }): Promise<{

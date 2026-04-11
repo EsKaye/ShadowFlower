@@ -12,6 +12,7 @@ export interface EnvironmentConfig {
   upstashRedisRestUrl?: string;
   upstashRedisRestToken?: string;
   gamedinSigningSecret?: string;
+  shadowflowerSigningSecret?: string; // For GameDin contract compliance
   // Feature flags
   enableDiscordInteractions?: boolean;
   // Discord bot/app configuration

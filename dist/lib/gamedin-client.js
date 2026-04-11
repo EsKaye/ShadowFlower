@@ -52,7 +52,8 @@ export class GameDinClient {
             };
             // Add HMAC signature if signing secret is configured
             if (this.config.signingSecret) {
-                const signatureHeaders = this.signRequest('POST', '/api/internal/moderation/advisory', payload);
+                const bodyString = JSON.stringify(payload);
+                const signatureHeaders = this.signRequest(bodyString);
                 Object.entries(signatureHeaders).forEach(([key, value]) => {
                     headers[key] = value;
                 });
@@ -102,6 +103,64 @@ export class GameDinClient {
         }
     }
     /**
+     * Handshake with GameDin - fetch reviewable moderation reports
+     * Uses exact GameDin contract: GET /api/private/moderation/reports/reviewable
+     * Empty body for signature calculation
+     */
+    async fetchReviewableReports() {
+        try {
+            const headers = {
+                ...this.getAuthHeaders(),
+            };
+            // Add HMAC signature if signing secret is configured
+            if (this.config.signingSecret) {
+                // For GET requests, body must be empty string for signature calculation
+                const signatureHeaders = this.signRequest('');
+                Object.entries(signatureHeaders).forEach(([key, value]) => {
+                    headers[key] = value;
+                });
+            }
+            const response = await this.client.get('/api/private/moderation/reports/reviewable', { headers });
+            console.log('Handshake successful: fetched reviewable reports from GameDin');
+            return response.data;
+        }
+        catch (error) {
+            const status = error instanceof Error && 'response' in error ? error.response?.status : 'unknown';
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            console.error(`Handshake failed: GET /api/private/moderation/reports/reviewable - Status: ${status}, Error: ${message}`);
+            throw new Error(`Failed to fetch reviewable reports: ${message}`);
+        }
+    }
+    /**
+     * Submit AI review advisory for a specific report
+     * Uses exact GameDin contract: POST /api/private/moderation/reports/:id/ai-review
+     * JSON body must be the exact raw body used for signature calculation
+     */
+    async submitAiReview(reportId, advisoryData) {
+        try {
+            const headers = {
+                ...this.getAuthHeaders(),
+            };
+            // Add HMAC signature if signing secret is configured
+            if (this.config.signingSecret) {
+                // Use exact raw JSON string for signature calculation
+                const bodyString = JSON.stringify(advisoryData);
+                const signatureHeaders = this.signRequest(bodyString);
+                Object.entries(signatureHeaders).forEach(([key, value]) => {
+                    headers[key] = value;
+                });
+            }
+            await this.client.post(`/api/private/moderation/reports/${reportId}/ai-review`, advisoryData, { headers });
+            console.log(`Advisory write-back successful: submitted AI review for report ${reportId}`);
+        }
+        catch (error) {
+            const status = error instanceof Error && 'response' in error ? error.response?.status : 'unknown';
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            console.error(`Advisory write-back failed: POST /api/private/moderation/reports/${reportId}/ai-review - Status: ${status}, Error: ${message}`);
+            throw new Error(`Failed to submit AI review for report ${reportId}: ${message}`);
+        }
+    }
+    /**
      * Get authentication headers for server-to-server communication
      */
     getAuthHeaders() {
@@ -112,22 +171,20 @@ export class GameDinClient {
         };
     }
     /**
-     * Sign a request with HMAC-SHA256
+     * Sign a request with HMAC-SHA256 using exact GameDin contract
      * Returns signature headers for privileged requests
+     * Uses timestamp:nonce:body format with Base64URL encoding
      */
-    signRequest(method, path, body) {
+    signRequest(body) {
         if (!this.config.signingSecret) {
             return {};
         }
         const signingConfig = {
             secretKey: this.config.signingSecret,
-            maxTimestampDelta: 5 * 60 * 1000, // 5 minutes
+            maxTimestampDelta: 300 * 1000, // 300 seconds
         };
-        const bodyString = typeof body === 'string' ? body : JSON.stringify(body || {});
         const signatureHeaders = signRequest(signingConfig, {
-            method,
-            path,
-            body: bodyString,
+            body: body,
         });
         // Convert SignatureHeaders to Record<string, string>
         return {

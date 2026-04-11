@@ -388,8 +388,6 @@ export function requireSignature(
     };
 
     const verification = await verifySignature(signingConfig, {
-      method: req.method || 'GET',
-      path: req.url || '/',
       body,
       headers: signatureHeaders,
     });

@@ -12,27 +12,31 @@ export function generateNonce() {
     return crypto.randomBytes(16).toString('hex');
 }
 /**
- * Create HMAC signature for a request
- * Signature covers: method + path + timestamp + nonce + body
+ * Create HMAC signature for a request using exact GameDin contract
+ * Signature format: HMAC-SHA256(SHADOWFLOWER_SIGNING_SECRET, timestamp + ":" + nonce + ":" + body)
+ * Base64URL encoding
  */
 export function createSignature(config, params) {
-    const { method, path, timestamp, nonce, body } = params;
-    // Create the message to sign
-    const message = `${method}\n${path}\n${timestamp}\n${nonce}\n${body}`;
+    const { timestamp, nonce, body } = params;
+    // Create the message to sign: timestamp:nonce:body
+    const message = `${timestamp}:${nonce}:${body}`;
     // Create HMAC-SHA256 signature
     const hmac = crypto.createHmac('sha256', config.secretKey);
     hmac.update(message);
-    return hmac.digest('hex');
+    // Return Base64URL encoded signature (not hex)
+    const signature = hmac.digest('base64');
+    // Convert Base64 to Base64URL (replace + with -, / with _, remove = padding)
+    return signature.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 /**
- * Sign a request with timestamp, nonce, and signature
+ * Sign a request with timestamp, nonce, and signature using exact GameDin contract
+ * Timestamp is Unix seconds (not milliseconds)
+ * Body is the exact string to be signed (empty string for GET requests)
  */
 export function signRequest(config, params) {
-    const timestamp = Date.now().toString();
+    const timestamp = Math.floor(Date.now() / 1000).toString(); // Unix seconds
     const nonce = generateNonce();
     const signature = createSignature(config, {
-        method: params.method,
-        path: params.path,
         timestamp,
         nonce,
         body: params.body,
@@ -44,12 +48,13 @@ export function signRequest(config, params) {
     };
 }
 /**
- * Verify a request signature
+ * Verify a request signature using exact GameDin contract
  * Returns true if signature is valid and timestamp is within allowed delta
  * Checks nonce against Redis for replay protection
+ * Timestamp is Unix seconds, max delta is 300 seconds
  */
 export async function verifySignature(config, params) {
-    const { method, path, body, headers } = params;
+    const { body, headers } = params;
     const timestamp = headers['x-shadowflower-timestamp'];
     const nonce = headers['x-shadowflower-nonce'];
     const providedSignature = headers['x-shadowflower-signature'];
@@ -58,22 +63,21 @@ export async function verifySignature(config, params) {
         return { valid: false, reason: 'Missing required signature headers' };
     }
     // Check timestamp is within allowed delta (replay protection)
-    const now = Date.now();
+    // Timestamp is Unix seconds, convert to milliseconds for comparison
+    const now = Math.floor(Date.now() / 1000);
     const requestTime = parseInt(timestamp, 10);
     const timeDelta = Math.abs(now - requestTime);
-    if (isNaN(requestTime) || timeDelta > config.maxTimestampDelta) {
+    if (isNaN(requestTime) || timeDelta > 300) {
         return { valid: false, reason: 'Timestamp outside allowed window' };
     }
     // Check nonce for replay protection using Redis
     const redis = getRedisService();
-    const nonceValid = await redis.verifyNonce(nonce, 300); // 5 minute TTL for nonces
+    const nonceValid = await redis.verifyNonce(nonce, 300); // 300 second TTL for nonces
     if (!nonceValid) {
         return { valid: false, reason: 'Replay detected - nonce already used' };
     }
-    // Recreate the signature
+    // Recreate the signature using new format
     const expectedSignature = createSignature(config, {
-        method,
-        path,
         timestamp,
         nonce,
         body,
