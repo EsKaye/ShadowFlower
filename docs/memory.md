@@ -47,6 +47,13 @@ ShadowFlower is a backend moderation and trust/safety service for GameDin.xyz, d
 ### Security Model
 
 - **API Key Authentication**: Separate keys for ShadowFlower and GameDin communication
+- **HMAC-SHA256 Signing**: Exact GameDin contract for server-to-server requests
+  - Signature format: `timestamp:nonce:body`
+  - Encoding: Base64URL
+  - Timestamp: Unix seconds (not milliseconds)
+  - Freshness window: 300 seconds
+  - Headers: `x-shadowflower-timestamp`, `x-shadowflower-nonce`, `x-shadowflower-signature`
+- **Nonce Replay Protection**: Redis-based nonce tracking with 300-second TTL
 - **Rate Limiting**: Prevents abuse and ensures fair usage
 - **Request Validation**: All inputs validated and sanitized
 - **Minimal Logging**: No sensitive data logged, security events tracked
