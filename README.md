@@ -1,62 +1,328 @@
 # 🌸 ShadowFlower
 
-Public nexus for the MK World Wide constellation. This repository hosts shared documentation, rituals, and prompts while coordinating autonomous guardian branches that evolve the ecosystem.
+Backend moderation and trust/safety service for GameDin.xyz. ShadowFlower is a lightweight, secure, server-to-server moderation worker that analyzes content and provides advisory recommendations to the GameDin moderator dashboard.
 
-## Guardians
-- **Athena** – strategy & intelligence
-- **Persephone** – transformation & migrations
-- **Brigid** – creativity & UX/content
-- **Hecate** – security & hidden ops
-- **Lilith** – experimental features
+## What ShadowFlower Is
 
-Lilybear serves as the voice and operations hub, relaying messages between guardians, MCP, and Serafina.
+- **Backend Service**: Server-to-server moderation API for GameDin
+- **AI-Powered**: Uses AI providers (Gemini, etc.) to analyze content
+- **Advisory Only**: Provides recommendations, does not take autonomous destructive actions
+- **Secure**: Server-to-server authentication with proper API key management
+- **Scalable**: Batch processing with configurable limits and timeouts
 
-## How It Autonomously Evolves
-- Nightly GitHub Action fast-forwards each guardian branch from `main` and opens PRs tagged `[council-auto]`.
-- Merged updates trigger `on-merge-dispatch.yml` to notify MCP and dispatch events to dependent repos.
-- Rituals in `rituals/` and prompts in `prompts/` keep context flowing across the network.
+## What ShadowFlower Is Not
 
-## MCP & Serafina Integration
-- `mcp.manifest.json` describes channels and directories consumed by the MCP server.
-- Secrets `MCP_URL` and `DISCORD_WEBHOOK_COUNCIL` allow automated notifications.
-- Downstream repos such as Serafina and GameDinVR listen for `repository_dispatch` events.
+- **User-Facing**: No direct user chat or public interface
+- **Autonomous Moderator**: Does not automatically ban/delete content
+- **Social Assistant**: Not the public voice of GameDin
+- **Full Platform**: Not a comprehensive moderation dashboard
+- **Monolith**: Lightweight and focused, not over-engineered
 
-### VRChat Bridge Workflow
-Serafina exposes slash commands (`/councilreport`, `/guardian`) and forwards messages to a Unity bridge via `UNITY_BRIDGE_URL`.
-The Unity side uses `DiscordMessageReceiver` and `LilybearOpsBus` to deliver those payloads to in-world guardians.
+## Architecture
 
-**Local development for Serafina:**
+### Core Components
+
+- **Provider Abstraction**: Swappable AI providers (Gemini, etc.)
+- **GameDin Client**: HTTP wrapper for GameDin API integration
+- **Moderation Pipeline**: Batch processing and job management
+- **Security Layer**: Authentication and request validation
+- **API Routes**: RESTful endpoints for health checks and job execution
+
+### Directory Structure
+
+```
+src/
+  config/          # Environment and service configuration
+  lib/             # GameDin client and utilities
+  providers/       # AI provider implementations
+  jobs/            # Moderation job pipeline
+  routes/          # API endpoints
+  security/        # Authentication and middleware
+  types/           # TypeScript type definitions
+```
+
+## API Endpoints
+
+### Public Endpoints
+
+- `GET /api/health` - Service health check and connectivity status
+
+### Protected Endpoints
+
+All protected endpoints require `x-shadowflower-api-key` header.
+
+- `POST /api/jobs/moderation/run` - Execute moderation job (sends results to GameDin)
+- `POST /api/jobs/moderation/dry-run` - Execute moderation job in dry-run mode
+
+## Environment Variables
+
+### Required
 
 ```bash
-cd serafina
-npm install
+GAMEDIN_BASE_URL=https://api.gamedin.xyz
+SHADOWFLOWER_API_KEY=your_shadowflower_api_key
+GAMEDIN_SHADOWFLOWER_API_KEY=your_gamedin_shadowflower_api_key
+```
+
+### Optional
+
+```bash
+GEMINI_API_KEY=your_gemini_api_key
+NODE_ENV=development
+DEFAULT_BATCH_SIZE=10
+DEFAULT_PROVIDER=gemini
+DEFAULT_MODEL=gemini-2.5-flash
+PROVIDER_TIMEOUT=30000
+MAX_RETRIES=3
+DRY_RUN_DEFAULT=true
+```
+
+## Local Development
+
+### Setup
+
+1. Clone the repository
+2. Copy environment configuration: `cp .env.example .env`
+3. Install dependencies: `npm install`
+4. Fill in your API keys in `.env`
+
+### Running Locally
+
+```bash
+# Development mode with hot reload
 npm run dev
+
+# Build for production
+npm run build
+
+# Type checking
+npm run type-check
+
+# Linting
+npm run lint
 ```
 
-Define environment variables in `.env` or the hosting platform (see [serafina/README.md](serafina/README.md)).
-
-### Running the Council Bot (Python)
+### Testing Endpoints
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # fill DISCORD_TOKEN and channel IDs as needed
-python shadowflower_council_bot.py
+# Health check (public)
+curl http://localhost:3000/api/health
+
+# Moderation job (protected)
+curl -X POST http://localhost:3000/api/jobs/moderation/run \
+  -H "x-shadowflower-api-key: your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{"batchSize": 5, "dryRun": true}'
 ```
 
-Minimum env:
-- `DISCORD_TOKEN` – bot token from the Discord developer portal
-- Optional: see `.env.example` for `MCP_URL`, `CHN_COUNCIL`, `WH_LILYBEAR`, etc.
+## Vercel Deployment
 
-If you set `MISTRAL_API_KEY`, the bot will use Mistral for natural responses in `!invoke` and `!divine`.
+### Root Deployment
+
+This repository is configured for **root-level deployment** on Vercel. The entire service deploys from the repository root, not from a subdirectory.
+
+### Deployment Steps
+
+1. **Configure Environment Variables**
+   - Go to Vercel dashboard
+   - Add all required environment variables
+   - Set production API keys
+
+2. **Deploy**
+   ```bash
+   # Deploy to production
+   vercel --prod
+   
+   # Preview deployment
+   vercel
+   ```
+
+3. **Verify Deployment**
+   - Test `/api/health` endpoint
+   - Test protected endpoints with API keys
+   - Check Vercel function logs
+
+### Vercel Configuration
+
+- `vercel.json` - Vercel deployment configuration
+- Functions located in `src/routes/`
+- TypeScript builds to `dist/`
+- Automatic API routing from `/api/*` to route handlers
+
+## GameDin Integration
+
+### Authentication
+
+ShadowFlower uses server-to-server authentication with GameDin:
+
+```typescript
+// ShadowFlower -> GameDin
+Authorization: Bearer <GAMEDIN_SHADOWFLOWER_API_KEY>
+X-Service: shadowflower
+```
+
+### Moderation Flow
+
+1. **Fetch Queue**: ShadowFlower requests moderation items from GameDin
+2. **Analyze Content**: AI provider analyzes each item
+3. **Generate Advisory**: Creates structured recommendations
+4. **Send Results**: Posts advisory results back to GameDin
+5. **Human Review**: GameDin moderators review and take action
+
+### Advisory Payload
+
+```typescript
+{
+  results: [{
+    itemId: string,
+    aiSummary: string,
+    aiReason: string,
+    aiConfidence: number,
+    aiRecommendedAction: 'approve' | 'review' | 'escalate' | 'remove' | 'suspend',
+    aiEscalateToAdmin: boolean,
+    aiProvider: string,
+    aiModel: string,
+    severity: 'low' | 'medium' | 'high' | 'critical',
+    categories: {
+      harassment: boolean,
+      hate: boolean,
+      violence: boolean,
+      sexual: boolean,
+      spam: boolean,
+      misinformation: boolean
+    }
+  }],
+  job: {
+    id: string,
+    startedAt: string,
+    completedAt: string,
+    duration: number,
+    provider: string,
+    model: string,
+    dryRun: boolean
+  }
+}
+```
+
+## Security Model
+
+### API Key Management
+
+- **ShadowFlower API Key**: Authenticates requests to ShadowFlower
+- **GameDin API Key**: Authenticates ShadowFlower requests to GameDin
+- **Provider API Keys**: AI provider authentication (Gemini, etc.)
+
+### Security Rules
+
+1. **Never commit secrets** to version control
+2. **Use different keys** for different environments
+3. **Rotate keys regularly** and monitor usage
+4. **Server-to-server only** - no user session dependencies
+5. **Rate limiting** and request validation
+6. **Minimal logging** of sensitive data
+
+## Provider Configuration
+
+### Gemini Provider
+
+```typescript
+// Configuration
+{
+  apiKey: string,
+  model: 'gemini-1.5-pro' | 'gemini-1.5-flash' | 'gemini-pro',
+  timeout: number,
+  maxRetries: number
+}
+```
+
+### Adding New Providers
+
+1. Implement `IModerationProvider` interface
+2. Add to provider registry
+3. Configure environment variables
+4. Update documentation
+
+## Monitoring and Debugging
+
+### Health Checks
+
+The `/api/health` endpoint provides:
+
+- Service status
+- GameDin connectivity
+- Provider connectivity
+- Uptime and version info
+
+### Logging
+
+- Request/response logging with unique IDs
+- Error tracking and context
+- Performance metrics
+- Security events
+
+### Job Tracking
+
+Each moderation job includes:
+
+- Unique job ID
+- Start/end timestamps
+- Processing duration
+- Provider used
+- Results summary
 
 ## Contributing
-1. Fork and branch from the guardian that matches your feature.
-2. Open a pull request to `main` using the template.
-3. Keep docs updated; `docs/` holds architecture and intent references.
 
-## Security
-Review [SECURITY.md](SECURITY.md) for vulnerability reporting instructions.
+### Development Guidelines
+
+1. **Keep it simple** - prefer explicit over clever
+2. **Type safety** - all TypeScript code strictly typed
+3. **Security first** - never expose secrets or bypass auth
+4. **Test locally** - verify endpoints before deploying
+5. **Document changes** - update README and type definitions
+
+### Pull Request Process
+
+1. Fork and create feature branch
+2. Implement changes with tests
+3. Update documentation
+4. Submit PR with clear description
+5. Address review feedback
+
+## Future Roadmap
+
+### v1.1
+- Additional AI providers (OpenAI, Anthropic)
+- Enhanced rate limiting
+- Job scheduling/cron support
+- Metrics and analytics
+
+### v1.2
+- Multi-tenant support
+- Advanced filtering options
+- Batch optimization
+- Provider failover
+
+### v2.0
+- Real-time streaming
+- Custom rule engine
+- Advanced analytics
+- Multi-region deployment
+
+## Support
+
+### Issues and Bugs
+
+- Check environment variables
+- Review API key configuration
+- Test with dry-run mode first
+- Check Vercel function logs
+
+### Security Issues
+
+Report security vulnerabilities through private channels only. Do not open public issues for security matters.
 
 ---
-Licensed under the [MIT License](LICENSE).
+
+**License**: MIT License  
+**Version**: 1.0.0  
+**Deployable**: Root-level Vercel deployment
