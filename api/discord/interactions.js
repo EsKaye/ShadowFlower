@@ -8,6 +8,7 @@ module.exports = async function handler(req, res) {
   if (req.method === 'GET') {
     const challenge = req.query.challenge;
     if (challenge) {
+      res.setHeader('Content-Type', 'text/plain');
       res.status(200).send(challenge);
       return;
     }
