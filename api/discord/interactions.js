@@ -3,25 +3,25 @@
  * Self-contained Vercel serverless function
  */
 
-import { VercelRequest, VercelResponse } from '@vercel/node';
+const { VercelRequest, VercelResponse } = require('@vercel/node');
 
-export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  const publicKey = process.env['DISCORD_PUBLIC_KEY'];
+module.exports = async function handler(req, res) {
+  const publicKey = process.env.DISCORD_PUBLIC_KEY;
 
   if (!publicKey) {
     res.status(500).json({ error: 'Discord bot not configured' });
     return;
   }
 
-  const signature = req.headers['x-signature-ed25519'] as string;
-  const timestamp = req.headers['x-signature-timestamp'] as string;
+  const signature = req.headers['x-signature-ed25519'];
+  const timestamp = req.headers['x-signature-timestamp'];
 
   if (!signature || !timestamp) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
 
-  const body = req.body as string || JSON.stringify(req.body);
+  const body = req.body || JSON.stringify(req.body);
 
   // Simple signature check (in production, use proper Ed25519 verification)
   // For now, we'll accept the request to test the endpoint
@@ -42,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
       switch (commandName) {
         case 'sf_status':
-          content = 'ShadowFlower status: ✅ Operational';
+          content = 'ShadowFlower status: Operational';
           break;
         case 'sf_queue':
           content = 'Moderation Queue: 0 items pending';
@@ -75,4 +75,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   } catch (error) {
     res.status(400).json({ error: 'Invalid interaction' });
   }
-}
+};
