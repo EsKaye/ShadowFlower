@@ -16,6 +16,7 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  // Handle POST requests (Discord interactions)
   const publicKey = process.env.DISCORD_PUBLIC_KEY;
 
   if (!publicKey) {
