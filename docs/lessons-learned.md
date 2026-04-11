@@ -119,6 +119,16 @@
 **Fix**: Removed production-ready claims and added honest status section with limitations
 **Prevention Rule**: Never claim production readiness without testing and validation, always document actual state
 
+### Problem: Root Endpoint Information Disclosure
+**Root Cause**: Root endpoint may reveal service information to unauthorized users
+**Fix**: Root endpoint returns 404 with minimal non-informative response
+**Prevention Rule**: Private services should return 404 at root to avoid information disclosure
+
+### Problem: Admin Endpoint Discovery
+**Root Cause**: Returning 401/403 for invalid admin attempts reveals admin endpoints exist
+**Fix**: Admin gate returns 404 instead of 401 to avoid revealing admin endpoints
+**Prevention Rule**: Return 404 for invalid admin access to avoid endpoint discovery
+
 ## Future Prevention Rules
 
 1. **TypeScript First**: Always configure TypeScript strictly at project start

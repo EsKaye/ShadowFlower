@@ -33,4 +33,13 @@ export declare function requestLogger(req: AuthenticatedRequest, res: VercelResp
  * Error handling middleware
  */
 export declare function errorHandler(error: Error, req: AuthenticatedRequest, res: VercelResponse, _next: (err?: Error) => void): void;
+/**
+ * Validate admin key from request headers
+ */
+export declare function validateAdminKey(request: VercelRequest): boolean;
+/**
+ * Admin gate middleware for protected admin routes
+ * Returns 404 instead of 401 if key is invalid to avoid revealing admin endpoints
+ */
+export declare function requireAdmin(handler: (req: AuthenticatedRequest, res: VercelResponse) => Promise<void> | void): (req: AuthenticatedRequest, res: VercelResponse) => Promise<void>;
 //# sourceMappingURL=auth.d.ts.map

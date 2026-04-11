@@ -80,7 +80,7 @@ src/
 
 ### Public Endpoints
 
-- `GET /api/health` - Service health check and connectivity status
+- `GET /api/health` - Service health check and connectivity status (minimal, safe)
 
 ### Protected Endpoints
 
@@ -88,6 +88,12 @@ All protected endpoints require `x-shadowflower-api-key` header.
 
 - `POST /api/jobs/moderation/run` - Execute moderation job (sends results to GameDin)
 - `POST /api/jobs/moderation/dry-run` - Execute moderation job in dry-run mode
+
+### Admin Endpoints
+
+Admin endpoints require `x-shadowflower-admin-key` header. If the key is invalid, the endpoint returns 404 instead of 401 to avoid revealing admin endpoints.
+
+- No admin endpoints currently implemented (reserved for future use)
 
 ## Environment Variables
 
@@ -111,6 +117,11 @@ DEFAULT_MODEL=gemini-2.5-flash
 PROVIDER_TIMEOUT=30000
 MAX_RETRIES=3
 DRY_RUN_DEFAULT=true
+SHADOWFLOWER_ADMIN_KEY=your_shadowflower_admin_key
+DISCORD_WEBHOOK_URL=your_discord_webhook_url
+DISCORD_ALERT_CHANNEL_ID=your_alert_channel_id
+DISCORD_DIGEST_CHANNEL_ID=your_digest_channel_id
+DISCORD_ADMIN_CHANNEL_ID=your_admin_channel_id
 ```
 
 ## Local Development
@@ -240,7 +251,75 @@ X-Service: shadowflower
 }
 ```
 
+## Discord Notifications
+
+ShadowFlower supports sending notifications to Discord via webhooks for moderation events and admin alerts.
+
+### Discord Setup
+
+1. Create a Discord webhook in your server settings
+2. Set the `DISCORD_WEBHOOK_URL` environment variable
+3. Optionally set channel IDs for different notification types
+
+### Notification Types
+
+The Discord adapter supports sending structured messages for:
+
+- **Moderation Batch Completed**: Summary of batch processing results
+- **Moderation Batch Failed**: Error notifications for failed batches
+- **High-Risk Escalation**: Notifications for items requiring immediate attention
+- **Admin Escalation**: Notifications requiring admin intervention
+- **Digest Summary**: Periodic summaries of moderation activity
+
+### Usage
+
+```typescript
+import { DiscordNotifier } from '../notifications';
+
+const notifier = new DiscordNotifier({
+  webhookUrl: process.env['DISCORD_WEBHOOK_URL'] || '',
+});
+
+await notifier.notifyBatchCompleted({
+  jobId: 'job-123',
+  itemsProcessed: 10,
+  itemsApproved: 8,
+  itemsReviewed: 2,
+  itemsEscalated: 0,
+  duration: 1500,
+});
+```
+
+### Configuration
+
+Environment variables for Discord notifications:
+
+- `DISCORD_WEBHOOK_URL`: Discord webhook URL (required for notifications)
+- `DISCORD_ALERT_CHANNEL_ID`: Channel for alert notifications
+- `DISCORD_DIGEST_CHANNEL_ID`: Channel for digest summaries
+- `DISCORD_ADMIN_CHANNEL_ID`: Channel for admin escalations
+
 ## Security Model
+
+### Private Service Posture
+
+ShadowFlower is designed as a **private backend service**, not a public website:
+
+- **Root endpoint**: Returns 404 (no public UI exposed)
+- **Health endpoint**: Minimal and safe, no sensitive information
+- **Job endpoints**: Require server-to-server authentication
+- **Admin endpoints**: Require admin key, return 404 if invalid to avoid revealing endpoints
+- **No public frontend**: ShadowFlower has no user-facing interface
+
+### Vercel Deployment Privacy
+
+On Vercel Hobby tier:
+- Deployments are not password-protected by default
+- Service relies on API key authentication for security
+- Root endpoint returns 404 to avoid revealing service information
+- CORS is restricted to specific origins via ALLOWED_ORIGIN
+
+**Important**: Do not expose sensitive information in health endpoints or error responses.
 
 ### API Key Management
 
@@ -257,6 +336,9 @@ X-Service: shadowflower
 5. **Rate limiting** and request validation
 6. **Minimal logging** of sensitive data
 7. **CORS restriction** - configure ALLOWED_ORIGIN for production
+8. **Private service posture** - root returns 404, no public UI
+9. **Admin gate** - use SHADOWFLOWER_ADMIN_KEY for admin endpoints
+10. **Never expose secrets** in logs, errors, or responses
 
 ### Current Limitations
 
@@ -264,6 +346,7 @@ X-Service: shadowflower
 - **Provider integration** not validated against real AI provider APIs
 - **GameDin client** not tested against actual GameDin endpoints
 - **Security middleware** requires proper environment configuration
+- **Discord notifications** not integrated into moderation pipeline yet
 
 ## Provider Configuration
 

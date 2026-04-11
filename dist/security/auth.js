@@ -110,4 +110,46 @@ export function errorHandler(error, req, res, _next) {
         requestId,
     });
 }
+/**
+ * Validate admin key from request headers
+ */
+export function validateAdminKey(request) {
+    const adminKey = process.env['SHADOWFLOWER_ADMIN_KEY'];
+    const providedKey = request.headers['x-shadowflower-admin-key'];
+    // If admin key is not configured, deny access
+    if (!adminKey) {
+        return false;
+    }
+    if (!providedKey) {
+        return false;
+    }
+    return providedKey === adminKey;
+}
+/**
+ * Admin gate middleware for protected admin routes
+ * Returns 404 instead of 401 if key is invalid to avoid revealing admin endpoints
+ */
+export function requireAdmin(handler) {
+    return async (req, res) => {
+        const requestId = generateRequestId();
+        req.requestId = requestId;
+        // Add CORS headers
+        res.setHeader('Access-Control-Allow-Origin', process.env['ALLOWED_ORIGIN'] || 'http://localhost:3000');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-shadowflower-api-key, x-shadowflower-admin-key');
+        // Handle preflight requests
+        if (req.method === 'OPTIONS') {
+            res.status(200).end();
+            return;
+        }
+        // Validate admin key - return 404 if invalid to avoid revealing admin endpoints
+        if (!validateAdminKey(req)) {
+            res.status(404).json({
+                message: 'Not Found',
+            });
+            return;
+        }
+        await handler(req, res);
+    };
+}
 //# sourceMappingURL=auth.js.map
