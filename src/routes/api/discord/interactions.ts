@@ -181,17 +181,17 @@ async function handleCommand(
   const commandName = interaction.data?.name;
 
   switch (commandName) {
-    case 'shadowflower_status':
+    case 'sf_status':
       return handleStatusCommand(interaction, config);
-    case 'shadowflower_queue':
+    case 'sf_queue':
       return handleQueueCommand(interaction, config);
-    case 'shadowflower_summary':
+    case 'sf_summary':
       return handleSummaryCommand(interaction, config);
-    case 'shadowflower_review':
+    case 'sf_review':
       return handleReviewCommand(interaction, config);
-    case 'shadowflower_dismiss':
+    case 'sf_dismiss':
       return handleDismissCommand(interaction, config);
-    case 'shadowflower_escalate':
+    case 'sf_escalate':
       return handleEscalateCommand(interaction, config);
     default:
       return {
