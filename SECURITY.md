@@ -8,7 +8,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability within this project, please send an email to [security@eskaye.dev](mailto:security@eskaye.dev). All security vulnerabilities will be promptly addressed.
+If you discover a security vulnerability within this project, please send an email to [sunny@gamedin.xyz](mailto:sunny@gamedin.xyz). All security vulnerabilities will be promptly addressed.
 
 Please do not report security vulnerabilities through public GitHub issues, discussions, or pull requests.
 
