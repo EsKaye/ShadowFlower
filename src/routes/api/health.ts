@@ -1,19 +1,18 @@
 /**
  * Health check API endpoint
+ * Minimal operational status only - no version or detailed service info exposed
  */
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { HealthResponse } from '../../types';
 import { GameDinClient } from '../../lib/gamedin-client';
 import { providerRegistry } from '../../providers';
 import { getConfig } from '../../config';
 
 export default async function handler(_req: VercelRequest, res: VercelResponse): Promise<void> {
   const startTime = Date.now();
-  
+
   try {
     const config = getConfig();
-    const uptime = process.uptime ? Math.floor(process.uptime()) : 0;
 
     // Check GameDin connectivity
     let gamedinStatus: 'connected' | 'disconnected' = 'disconnected';
@@ -23,7 +22,7 @@ export default async function handler(_req: VercelRequest, res: VercelResponse):
         apiKey: config.environment.gamedinShadowflowerApiKey,
         timeout: 5000,
       });
-      
+
       gamedinStatus = await gamedinClient.healthCheck() ? 'connected' : 'disconnected';
     } catch (error) {
       gamedinStatus = 'disconnected';
@@ -33,11 +32,9 @@ export default async function handler(_req: VercelRequest, res: VercelResponse):
     const providerHealth = await providerRegistry.healthCheckAll();
     const providerStatus = Object.values(providerHealth).some(healthy => healthy) ? 'connected' : 'disconnected';
 
-    const response: HealthResponse = {
+    const response = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      version: process.env['npm_package_version'] || '1.0.0',
-      uptime,
       services: {
         gamedin: gamedinStatus,
         provider: providerStatus,
@@ -49,11 +46,9 @@ export default async function handler(_req: VercelRequest, res: VercelResponse):
     res.status(200).json(response);
 
   } catch (error) {
-    const response: HealthResponse = {
+    const response = {
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
-      version: process.env['npm_package_version'] || '1.0.0',
-      uptime: process.uptime ? Math.floor(process.uptime()) : 0,
       services: {
         gamedin: 'disconnected',
         provider: 'disconnected',

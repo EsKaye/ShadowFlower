@@ -3,6 +3,10 @@
  */
 
 import axios from 'axios';
+import {
+  logDiscordNotificationSuccess,
+  logDiscordNotificationFailure,
+} from '../security/audit-logger';
 
 export interface DiscordMessage {
   content?: string;
@@ -57,9 +61,18 @@ export class DiscordNotifier {
         headers: {
           'Content-Type': 'application/json',
         },
+        timeout: 10000, // 10 second timeout
+      });
+      logDiscordNotificationSuccess({
+        notificationType: 'webhook',
       });
     } catch (error) {
-      console.error('Failed to send Discord notification:', error instanceof Error ? error.message : 'Unknown error');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to send Discord notification:', errorMessage);
+      logDiscordNotificationFailure({
+        notificationType: 'webhook',
+        error: errorMessage,
+      });
     }
   }
 

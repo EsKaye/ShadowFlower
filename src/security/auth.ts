@@ -4,10 +4,68 @@
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getConfig } from '../config';
+import {
+  logAuthSuccess,
+  logAuthFailure,
+  logCorsRejected,
+  logAdminAuthSuccess,
+  logAdminAuthFailure,
+  logRateLimitExceeded,
+} from './audit-logger';
 
 export interface AuthenticatedRequest extends VercelRequest {
   authenticated?: boolean;
   requestId?: string;
+}
+
+export interface CorsConfig {
+  allowedOrigins: string[];
+  allowedMethods: string[];
+  allowedHeaders: string[];
+  allowCredentials: boolean;
+}
+
+/**
+ * Get CORS configuration from environment
+ */
+export function getCorsConfig(): CorsConfig {
+  const allowedOrigin = process.env['ALLOWED_ORIGIN'] || 'http://localhost:3000';
+  
+  return {
+    allowedOrigins: allowedOrigin.split(',').map(origin => origin.trim()),
+    allowedMethods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'x-shadowflower-api-key', 'x-shadowflower-admin-key'],
+    allowCredentials: false,
+  };
+}
+
+/**
+ * Apply CORS headers to response
+ * Returns false if origin is not allowed
+ */
+export function applyCorsHeaders(req: VercelRequest, res: VercelResponse): boolean {
+  const config = getCorsConfig();
+  const origin = req.headers['origin'] as string;
+
+  // If no origin header (non-browser request), no CORS needed
+  if (!origin) {
+    return true;
+  }
+
+  // Check if origin is allowed
+  if (!config.allowedOrigins.includes(origin)) {
+    return false;
+  }
+
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Access-Control-Allow-Methods', config.allowedMethods.join(', '));
+  res.setHeader('Access-Control-Allow-Headers', config.allowedHeaders.join(', '));
+  
+  if (config.allowCredentials) {
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+
+  return true;
 }
 
 /**
@@ -23,7 +81,7 @@ export function generateRequestId(): string {
 export function validateApiKey(request: VercelRequest): boolean {
   const config = getConfig();
   const providedKey = request.headers['x-shadowflower-api-key'];
-  
+
   if (!providedKey) {
     return false;
   }
@@ -41,11 +99,24 @@ export function requireAuth(
     const requestId = generateRequestId();
     req.requestId = requestId;
 
-    // Add CORS headers - restrict to specific origin in production
-    const allowedOrigin = process.env['ALLOWED_ORIGIN'] || 'http://localhost:3000';
-    res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-shadowflower-api-key');
+    const clientId = (req.headers['x-forwarded-for'] as string) ||
+                     (req.headers['x-real-ip'] as string) ||
+                     'unknown';
+
+    // Apply CORS headers - reject if origin not allowed
+    if (!applyCorsHeaders(req, res)) {
+      const origin = req.headers['origin'] as string;
+      if (origin && req.url) {
+        logCorsRejected({ requestId, origin, route: req.url });
+      }
+      res.status(403).json({
+        error: 'Forbidden',
+        message: 'Origin not allowed',
+        timestamp: new Date().toISOString(),
+        requestId,
+      });
+      return;
+    }
 
     // Handle preflight requests
     if (req.method === 'OPTIONS') {
@@ -55,6 +126,7 @@ export function requireAuth(
 
     // Validate API key
     if (!validateApiKey(req)) {
+      logAuthFailure({ requestId, clientId, reason: 'Invalid API key' });
       res.status(401).json({
         error: 'Unauthorized',
         message: 'Valid API key required',
@@ -64,13 +136,16 @@ export function requireAuth(
       return;
     }
 
+    logAuthSuccess({ requestId, clientId });
     req.authenticated = true;
     await handler(req, res);
   };
 }
 
 /**
- * Rate limiting middleware (simple implementation)
+ * Rate limiting middleware (simple in-memory implementation)
+ * NOTE: This is a lightweight/dev-grade rate limiter that resets on function restart
+ * For production-grade rate limiting, use a distributed rate limiter with persistent storage
  */
 export function rateLimit(options: {
   windowMs: number;
@@ -79,10 +154,10 @@ export function rateLimit(options: {
   const requests = new Map<string, { count: number; resetTime: number }>();
 
   return (req: AuthenticatedRequest, res: VercelResponse, next: () => void): void => {
-    const clientId = req.headers['x-forwarded-for'] as string || 
-                     req.headers['x-real-ip'] as string || 
+    const clientId = req.headers['x-forwarded-for'] as string ||
+                     req.headers['x-real-ip'] as string ||
                      'unknown';
-    
+
     const now = Date.now();
     const clientRequests = requests.get(clientId);
 
@@ -96,11 +171,17 @@ export function rateLimit(options: {
     }
 
     if (clientRequests.count >= options.maxRequests) {
+      const requestId = req.requestId || generateRequestId();
+      if (req.url) {
+        logRateLimitExceeded({ requestId, clientId, route: req.url });
+      } else {
+        logRateLimitExceeded({ requestId, clientId });
+      }
       res.status(429).json({
         error: 'Too Many Requests',
         message: 'Rate limit exceeded',
         timestamp: new Date().toISOString(),
-        requestId: req.requestId,
+        requestId,
       });
       return;
     }
@@ -181,10 +262,21 @@ export function requireAdmin(
     const requestId = generateRequestId();
     req.requestId = requestId;
 
-    // Add CORS headers
-    res.setHeader('Access-Control-Allow-Origin', process.env['ALLOWED_ORIGIN'] || 'http://localhost:3000');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-shadowflower-api-key, x-shadowflower-admin-key');
+    const clientId = (req.headers['x-forwarded-for'] as string) ||
+                     (req.headers['x-real-ip'] as string) ||
+                     'unknown';
+
+    // Apply CORS headers - reject if origin not allowed
+    if (!applyCorsHeaders(req, res)) {
+      const origin = req.headers['origin'] as string;
+      if (origin && req.url) {
+        logCorsRejected({ requestId, origin, route: req.url });
+      }
+      res.status(404).json({
+        message: 'Not Found',
+      });
+      return;
+    }
 
     // Handle preflight requests
     if (req.method === 'OPTIONS') {
@@ -194,12 +286,14 @@ export function requireAdmin(
 
     // Validate admin key - return 404 if invalid to avoid revealing admin endpoints
     if (!validateAdminKey(req)) {
+      logAdminAuthFailure({ requestId, clientId });
       res.status(404).json({
         message: 'Not Found',
       });
       return;
     }
 
+    logAdminAuthSuccess({ requestId, clientId });
     await handler(req, res);
   };
 }

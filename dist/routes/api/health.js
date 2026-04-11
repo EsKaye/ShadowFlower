@@ -1,5 +1,6 @@
 /**
  * Health check API endpoint
+ * Minimal operational status only - no version or detailed service info exposed
  */
 import { GameDinClient } from '../../lib/gamedin-client';
 import { providerRegistry } from '../../providers';
@@ -8,7 +9,6 @@ export default async function handler(_req, res) {
     const startTime = Date.now();
     try {
         const config = getConfig();
-        const uptime = process.uptime ? Math.floor(process.uptime()) : 0;
         // Check GameDin connectivity
         let gamedinStatus = 'disconnected';
         try {
@@ -28,8 +28,6 @@ export default async function handler(_req, res) {
         const response = {
             status: 'healthy',
             timestamp: new Date().toISOString(),
-            version: process.env['npm_package_version'] || '1.0.0',
-            uptime,
             services: {
                 gamedin: gamedinStatus,
                 provider: providerStatus,
@@ -43,8 +41,6 @@ export default async function handler(_req, res) {
         const response = {
             status: 'unhealthy',
             timestamp: new Date().toISOString(),
-            version: process.env['npm_package_version'] || '1.0.0',
-            uptime: process.uptime ? Math.floor(process.uptime()) : 0,
             services: {
                 gamedin: 'disconnected',
                 provider: 'disconnected',

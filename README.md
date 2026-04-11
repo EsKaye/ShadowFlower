@@ -95,6 +95,88 @@ Admin endpoints require `x-shadowflower-admin-key` header. If the key is invalid
 
 - No admin endpoints currently implemented (reserved for future use)
 
+## Security Hardening
+
+ShadowFlower has undergone a security hardening pass to improve its security posture. The following measures have been implemented:
+
+### Route Classification
+
+All routes are explicitly classified by access level:
+
+- **Public**: `/api/health` - Minimal operational status only
+- **Protected**: `/api/jobs/moderation/run`, `/api/jobs/moderation/dry-run` - Require `SHADOWFLOWER_API_KEY`
+- **Admin**: Reserved for future admin endpoints - Require `SHADOWFLOWER_ADMIN_KEY`
+- **Root**: `/` - Returns 404 to avoid information disclosure
+
+See `src/security/route-policy.ts` for the central route policy.
+
+### Authentication and Authorization
+
+- **API Key Authentication**: Protected routes require `x-shadowflower-api-key` header
+- **Admin Gate**: Admin routes require `x-shadowflower-admin-key` header (returns 404 on failure)
+- **HMAC Signing**: Inter-service requests can use HMAC-SHA256 signatures for enhanced security (optional)
+- **CORS Validation**: Strict CORS checking against allowed origins (rejects invalid origins with 403)
+
+### Audit Logging
+
+All security events are logged in structured JSON format:
+
+- Authentication successes and failures
+- Admin authentication attempts
+- Signature verification failures
+- Rate limit exceeded events
+- CORS rejections
+- Discord notification successes and failures
+
+Logs are sanitized to remove sensitive data (API keys, secrets, tokens).
+
+### Information Disclosure
+
+- Health endpoint no longer exposes version or uptime
+- Error messages are generic in production
+- Stack traces never exposed in responses
+- Root endpoint returns 404 with minimal response
+
+### Rate Limiting
+
+Current rate limiting is in-memory only (dev-grade):
+- Resets on function restart
+- No distributed coordination
+- Documented limitation in code comments
+
+For production-grade rate limiting, implement distributed rate limiting with persistent storage.
+
+### Discord Integration
+
+- Webhook URL stored in environment variables only
+- 10-second timeout on webhook requests
+- Audit logging for all notification attempts
+- Error handling prevents notification spam loops
+
+### Dependencies
+
+- Minimal dependency footprint (only @vercel/node and axios)
+- Removed unnecessary crypto dependency (built into Node.js)
+- All dependencies actively maintained and security-reviewed
+
+### Current Limitations
+
+- **Rate Limiting**: In-memory only, resets on function restart
+- **HMAC Signing**: Implemented but not yet integrated into route middleware
+- **Audit Logs**: Console output only, not centralized or persistent
+- **Secret Validation**: No secret strength validation at startup
+- **Discord Integration**: Not yet integrated into moderation pipeline
+
+### What Remains Before Production Readiness
+
+- Integrate HMAC signature verification into protected route middleware
+- Implement distributed rate limiting with persistent storage
+- Set up centralized audit log aggregation
+- Add secret strength validation at startup
+- Integrate Discord notifications into moderation pipeline
+- Add comprehensive integration tests
+- Set up monitoring and alerting for security events
+
 ## Environment Variables
 
 ### Required

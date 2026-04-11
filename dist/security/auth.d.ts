@@ -6,6 +6,21 @@ export interface AuthenticatedRequest extends VercelRequest {
     authenticated?: boolean;
     requestId?: string;
 }
+export interface CorsConfig {
+    allowedOrigins: string[];
+    allowedMethods: string[];
+    allowedHeaders: string[];
+    allowCredentials: boolean;
+}
+/**
+ * Get CORS configuration from environment
+ */
+export declare function getCorsConfig(): CorsConfig;
+/**
+ * Apply CORS headers to response
+ * Returns false if origin is not allowed
+ */
+export declare function applyCorsHeaders(req: VercelRequest, res: VercelResponse): boolean;
 /**
  * Generate a unique request ID for tracking
  */
@@ -19,7 +34,9 @@ export declare function validateApiKey(request: VercelRequest): boolean;
  */
 export declare function requireAuth(handler: (req: AuthenticatedRequest, res: VercelResponse) => Promise<void> | void): (req: AuthenticatedRequest, res: VercelResponse) => Promise<void>;
 /**
- * Rate limiting middleware (simple implementation)
+ * Rate limiting middleware (simple in-memory implementation)
+ * NOTE: This is a lightweight/dev-grade rate limiter that resets on function restart
+ * For production-grade rate limiting, use a distributed rate limiter with persistent storage
  */
 export declare function rateLimit(options: {
     windowMs: number;

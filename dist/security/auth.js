@@ -2,6 +2,42 @@
  * Authentication and security middleware for ShadowFlower service
  */
 import { getConfig } from '../config';
+import { logAuthSuccess, logAuthFailure, logCorsRejected, logAdminAuthSuccess, logAdminAuthFailure, logRateLimitExceeded, } from './audit-logger';
+/**
+ * Get CORS configuration from environment
+ */
+export function getCorsConfig() {
+    const allowedOrigin = process.env['ALLOWED_ORIGIN'] || 'http://localhost:3000';
+    return {
+        allowedOrigins: allowedOrigin.split(',').map(origin => origin.trim()),
+        allowedMethods: ['GET', 'POST', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'x-shadowflower-api-key', 'x-shadowflower-admin-key'],
+        allowCredentials: false,
+    };
+}
+/**
+ * Apply CORS headers to response
+ * Returns false if origin is not allowed
+ */
+export function applyCorsHeaders(req, res) {
+    const config = getCorsConfig();
+    const origin = req.headers['origin'];
+    // If no origin header (non-browser request), no CORS needed
+    if (!origin) {
+        return true;
+    }
+    // Check if origin is allowed
+    if (!config.allowedOrigins.includes(origin)) {
+        return false;
+    }
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', config.allowedMethods.join(', '));
+    res.setHeader('Access-Control-Allow-Headers', config.allowedHeaders.join(', '));
+    if (config.allowCredentials) {
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+    return true;
+}
 /**
  * Generate a unique request ID for tracking
  */
@@ -26,11 +62,23 @@ export function requireAuth(handler) {
     return async (req, res) => {
         const requestId = generateRequestId();
         req.requestId = requestId;
-        // Add CORS headers - restrict to specific origin in production
-        const allowedOrigin = process.env['ALLOWED_ORIGIN'] || 'http://localhost:3000';
-        res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-shadowflower-api-key');
+        const clientId = req.headers['x-forwarded-for'] ||
+            req.headers['x-real-ip'] ||
+            'unknown';
+        // Apply CORS headers - reject if origin not allowed
+        if (!applyCorsHeaders(req, res)) {
+            const origin = req.headers['origin'];
+            if (origin && req.url) {
+                logCorsRejected({ requestId, origin, route: req.url });
+            }
+            res.status(403).json({
+                error: 'Forbidden',
+                message: 'Origin not allowed',
+                timestamp: new Date().toISOString(),
+                requestId,
+            });
+            return;
+        }
         // Handle preflight requests
         if (req.method === 'OPTIONS') {
             res.status(200).end();
@@ -38,6 +86,7 @@ export function requireAuth(handler) {
         }
         // Validate API key
         if (!validateApiKey(req)) {
+            logAuthFailure({ requestId, clientId, reason: 'Invalid API key' });
             res.status(401).json({
                 error: 'Unauthorized',
                 message: 'Valid API key required',
@@ -46,12 +95,15 @@ export function requireAuth(handler) {
             });
             return;
         }
+        logAuthSuccess({ requestId, clientId });
         req.authenticated = true;
         await handler(req, res);
     };
 }
 /**
- * Rate limiting middleware (simple implementation)
+ * Rate limiting middleware (simple in-memory implementation)
+ * NOTE: This is a lightweight/dev-grade rate limiter that resets on function restart
+ * For production-grade rate limiting, use a distributed rate limiter with persistent storage
  */
 export function rateLimit(options) {
     const requests = new Map();
@@ -70,11 +122,18 @@ export function rateLimit(options) {
             return;
         }
         if (clientRequests.count >= options.maxRequests) {
+            const requestId = req.requestId || generateRequestId();
+            if (req.url) {
+                logRateLimitExceeded({ requestId, clientId, route: req.url });
+            }
+            else {
+                logRateLimitExceeded({ requestId, clientId });
+            }
             res.status(429).json({
                 error: 'Too Many Requests',
                 message: 'Rate limit exceeded',
                 timestamp: new Date().toISOString(),
-                requestId: req.requestId,
+                requestId,
             });
             return;
         }
@@ -133,10 +192,20 @@ export function requireAdmin(handler) {
     return async (req, res) => {
         const requestId = generateRequestId();
         req.requestId = requestId;
-        // Add CORS headers
-        res.setHeader('Access-Control-Allow-Origin', process.env['ALLOWED_ORIGIN'] || 'http://localhost:3000');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-shadowflower-api-key, x-shadowflower-admin-key');
+        const clientId = req.headers['x-forwarded-for'] ||
+            req.headers['x-real-ip'] ||
+            'unknown';
+        // Apply CORS headers - reject if origin not allowed
+        if (!applyCorsHeaders(req, res)) {
+            const origin = req.headers['origin'];
+            if (origin && req.url) {
+                logCorsRejected({ requestId, origin, route: req.url });
+            }
+            res.status(404).json({
+                message: 'Not Found',
+            });
+            return;
+        }
         // Handle preflight requests
         if (req.method === 'OPTIONS') {
             res.status(200).end();
@@ -144,11 +213,13 @@ export function requireAdmin(handler) {
         }
         // Validate admin key - return 404 if invalid to avoid revealing admin endpoints
         if (!validateAdminKey(req)) {
+            logAdminAuthFailure({ requestId, clientId });
             res.status(404).json({
                 message: 'Not Found',
             });
             return;
         }
+        logAdminAuthSuccess({ requestId, clientId });
         await handler(req, res);
     };
 }
