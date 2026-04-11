@@ -37,8 +37,11 @@ function getEnvironmentConfig(): EnvironmentConfig {
   };
 
   // Conditionally add optional properties
-  if (process.env['GEMINI_API_KEY']) {
-    config.geminiApiKey = process.env['GEMINI_API_KEY'];
+  if (process.env['NVIDIA_API_KEY']) {
+    config.nvidiaApiKey = process.env['NVIDIA_API_KEY'];
+  }
+  if (process.env['ENABLE_DISCORD_INTERACTIONS']) {
+    config.enableDiscordInteractions = process.env['ENABLE_DISCORD_INTERACTIONS'] === 'true';
   }
   if (process.env['PORT']) {
     config.port = parseInt(process.env['PORT'], 10);

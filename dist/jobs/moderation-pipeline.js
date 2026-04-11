@@ -278,11 +278,11 @@ export class ModerationPipeline {
      */
     getProviderApiKey(provider) {
         switch (provider.toLowerCase()) {
-            case 'gemini':
-                if (!this.config.environment.geminiApiKey) {
-                    throw new Error('Gemini API key not configured');
+            case 'nvidia':
+                if (!this.config.environment.nvidiaApiKey) {
+                    throw new Error('NVIDIA API key not configured');
                 }
-                return this.config.environment.geminiApiKey;
+                return this.config.environment.nvidiaApiKey;
             default:
                 throw new Error(`No API key configured for provider: ${provider}`);
         }

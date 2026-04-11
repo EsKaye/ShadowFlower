@@ -5,12 +5,13 @@ export interface EnvironmentConfig {
     gamedinBaseUrl: string;
     shadowflowerApiKey: string;
     gamedinShadowflowerApiKey: string;
-    geminiApiKey?: string;
+    nvidiaApiKey?: string;
     nodeEnv: 'development' | 'production';
     port?: number;
     upstashRedisRestUrl?: string;
     upstashRedisRestToken?: string;
     gamedinSigningSecret?: string;
+    enableDiscordInteractions?: boolean;
     discordApplicationId?: string;
     discordPublicKey?: string;
     discordBotToken?: string;

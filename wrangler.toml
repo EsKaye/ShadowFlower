@@ -1,0 +1,23 @@
+name = "shadowflower-discord"
+main = "workers/discord/index.ts"
+compatibility_date = "2024-04-01"
+
+[vars]
+DISCORD_APPLICATION_ID = "1402785172037828718"
+DISCORD_PUBLIC_KEY = "dd0365727ca52916b72b352b30065e8e91c0a2a52abc10def3abc239def5ee8b"
+
+[[kv_namespaces]]
+binding = "SHADOWFLOWER"
+id = "2b83bcd036a24314b7576e29fc172a07"
+
+[[durable_objects.bindings]]
+name = "GATEWAY"
+class_name = "DiscordGateway"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DiscordGateway"]
+
+[[routes]]
+pattern = "sf.gamedin.xyz"
+zone_name = "gamedin.xyz"

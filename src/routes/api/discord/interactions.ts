@@ -1,6 +1,7 @@
 /**
  * Discord interaction endpoint for slash commands
  * Handles Discord bot/app interactions with signature verification
+ * Only enabled when ENABLE_DISCORD_INTERACTIONS=true
  */
 
 import { VercelRequest, VercelResponse } from '@vercel/node';
@@ -21,6 +22,12 @@ import { GameDinClient } from '../../../lib/gamedin-client';
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const config = getConfig();
 
+  // Check if Discord interactions are enabled
+  if (!config.environment.enableDiscordInteractions) {
+    res.status(404).json({ error: 'Discord interactions are disabled' });
+    return;
+  }
+
   // Check if Discord bot is configured
   if (!config.environment.discordPublicKey) {
     console.error('Discord bot not configured - missing public key');
@@ -28,7 +35,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  // Extract Discord verification headers
+  // Get raw body for signature verification
+  const body = req.body as string || JSON.stringify(req.body);
+
+  console.log('Discord interaction request body:', body);
+
+  // Parse interaction first to check if it's a PING request
+  let interaction: DiscordInteraction;
+  try {
+    interaction = JSON.parse(body) as DiscordInteraction;
+    console.log('Parsed interaction type:', interaction.type);
+  } catch (error) {
+    console.error('Failed to parse Discord interaction:', error);
+    res.status(400).json({ error: 'Invalid interaction' });
+    return;
+  }
+
+  // Handle PING interaction (Discord verification - skip signature verification)
+  if (interaction.type === InteractionType.PING) {
+    console.log('Handling PING request');
+    const response: DiscordInteractionResponse = {
+      type: InteractionResponseType.PONG,
+    };
+    res.status(200).json(response);
+    return;
+  }
+
+  // Extract Discord verification headers for non-PING requests
   const discordHeaders = extractDiscordHeaders(req);
   if (!discordHeaders) {
     console.error('Missing Discord signature headers');
@@ -36,10 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  // Get raw body for signature verification
-  const body = req.body as string || JSON.stringify(req.body);
-
-  // Verify Discord signature
+  // Verify Discord signature for non-PING requests
   const signatureValid = verifyDiscordSignature(
     { publicKey: config.environment.discordPublicKey },
     {
@@ -52,25 +82,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   if (!signatureValid) {
     console.error('Invalid Discord signature');
     res.status(401).json({ error: 'Unauthorized' });
-    return;
-  }
-
-  // Parse interaction
-  let interaction: DiscordInteraction;
-  try {
-    interaction = JSON.parse(body) as DiscordInteraction;
-  } catch (error) {
-    console.error('Failed to parse Discord interaction:', error);
-    res.status(400).json({ error: 'Invalid interaction' });
-    return;
-  }
-
-  // Handle PING interaction (Discord verification)
-  if (interaction.type === InteractionType.PING) {
-    const response: DiscordInteractionResponse = {
-      type: InteractionResponseType.PONG,
-    };
-    res.status(200).json(response);
     return;
   }
 

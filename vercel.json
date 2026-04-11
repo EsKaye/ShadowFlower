@@ -4,5 +4,11 @@
   "framework": null,
   "env": {
     "NODE_ENV": "production"
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/src/routes/api/$1"
+    }
+  ]
 }

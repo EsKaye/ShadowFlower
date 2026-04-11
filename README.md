@@ -5,10 +5,11 @@ Backend moderation and trust/safety service for GameDin.xyz. ShadowFlower is a l
 ## What ShadowFlower Is
 
 - **Backend Service**: Server-to-server moderation API for GameDin
-- **AI-Powered**: Uses AI providers (Gemini, etc.) to analyze content
+- **AI-Powered**: Uses AI providers (NVIDIA Moonshot Kimi, etc.) to analyze content
 - **Advisory Only**: Provides recommendations, does not take autonomous destructive actions
 - **Secure**: Server-to-server authentication with proper API key management
 - **Scalable**: Batch processing with configurable limits and timeouts
+- **Moderation-First**: Core functionality is moderation pipeline; Discord bot support is optional
 
 ## What ShadowFlower Is Not
 
@@ -19,6 +20,24 @@ Backend moderation and trust/safety service for GameDin.xyz. ShadowFlower is a l
 - **Monolith**: Lightweight and focused, not over-engineered
 
 ## Current Status
+
+### Moderation-First Architecture
+
+ShadowFlower is a moderation-first service. The core functionality is the moderation pipeline that processes content from GameDin and provides advisory recommendations. Discord bot interactions are optional and deferred to a later pass.
+
+**Core Functionality (Active):**
+- Moderation pipeline for processing content batches
+- GameDin integration with HMAC signing
+- AI provider abstraction (NVIDIA Moonshot Kimi, etc.)
+- Redis-backed coordination (rate limiting, replay protection, job locking)
+- Private API endpoints for job execution
+- Server-to-server authentication
+
+**Optional Functionality (Deferred):**
+- Discord slash command interactions (disabled by default, requires ENABLE_DISCORD_INTERACTIONS=true)
+- Discord bot endpoint verification (not required for core functionality)
+
+**Discord notifications remain optional** and can be configured via DISCORD_WEBHOOK_URL for outbound notifications.
 
 ### Development Scaffold - Requires Testing and Validation
 
