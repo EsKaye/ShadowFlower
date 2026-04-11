@@ -26,8 +26,9 @@ export function requireAuth(handler) {
     return async (req, res) => {
         const requestId = generateRequestId();
         req.requestId = requestId;
-        // Add CORS headers
-        res.setHeader('Access-Control-Allow-Origin', '*');
+        // Add CORS headers - restrict to specific origin in production
+        const allowedOrigin = process.env['ALLOWED_ORIGIN'] || 'http://localhost:3000';
+        res.setHeader('Access-Control-Allow-Origin', allowedOrigin);
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-shadowflower-api-key');
         // Handle preflight requests

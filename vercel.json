@@ -4,6 +4,12 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": null,
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/src/routes/api/$1"
+    }
+  ],
   "env": {
     "NODE_ENV": "production"
   }
