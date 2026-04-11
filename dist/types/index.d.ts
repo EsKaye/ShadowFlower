@@ -4,4 +4,5 @@
 export * from './moderation';
 export * from './api';
 export * from './config';
+export * from './discord';
 //# sourceMappingURL=index.d.ts.map

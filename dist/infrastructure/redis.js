@@ -74,6 +74,13 @@ export class RedisService {
         }
     }
     /**
+     * Get Redis client for direct operations
+     * Returns null if Redis is not available
+     */
+    getClient() {
+        return this.client;
+    }
+    /**
      * Rate limiting - distributed token bucket
      * Returns true if request is allowed, false if rate limit exceeded
      */

@@ -12,6 +12,14 @@ export interface EnvironmentConfig {
   upstashRedisRestUrl?: string;
   upstashRedisRestToken?: string;
   gamedinSigningSecret?: string;
+  // Discord bot/app configuration
+  discordApplicationId?: string;
+  discordPublicKey?: string;
+  discordBotToken?: string;
+  discordAllowedGuildId?: string;
+  discordAllowedChannelIds?: string;
+  discordAllowedRoleIds?: string;
+  discordAllowedUserIds?: string;
 }
 
 export interface ModerationConfig {

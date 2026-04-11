@@ -109,6 +109,29 @@ function getEnvironmentConfig(): EnvironmentConfig {
     }
   }
 
+  // Discord bot configuration (optional)
+  if (process.env['DISCORD_APPLICATION_ID']) {
+    config.discordApplicationId = process.env['DISCORD_APPLICATION_ID'];
+  }
+  if (process.env['DISCORD_PUBLIC_KEY']) {
+    config.discordPublicKey = process.env['DISCORD_PUBLIC_KEY'];
+  }
+  if (process.env['DISCORD_BOT_TOKEN']) {
+    config.discordBotToken = process.env['DISCORD_BOT_TOKEN'];
+  }
+  if (process.env['DISCORD_ALLOWED_GUILD_ID']) {
+    config.discordAllowedGuildId = process.env['DISCORD_ALLOWED_GUILD_ID'];
+  }
+  if (process.env['DISCORD_ALLOWED_CHANNEL_IDS']) {
+    config.discordAllowedChannelIds = process.env['DISCORD_ALLOWED_CHANNEL_IDS'];
+  }
+  if (process.env['DISCORD_ALLOWED_ROLE_IDS']) {
+    config.discordAllowedRoleIds = process.env['DISCORD_ALLOWED_ROLE_IDS'];
+  }
+  if (process.env['DISCORD_ALLOWED_USER_IDS']) {
+    config.discordAllowedUserIds = process.env['DISCORD_ALLOWED_USER_IDS'];
+  }
+
   return config;
 }
 

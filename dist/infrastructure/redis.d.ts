@@ -3,6 +3,7 @@
  * Provides distributed coordination, rate limiting, replay protection, and job locking
  * Fails safely if Redis is unavailable - degrades gracefully with documented limitations
  */
+import { Redis } from '@upstash/redis';
 export interface RedisConfig {
     url: string;
     token: string;
@@ -30,6 +31,11 @@ export declare class RedisService {
      * Check Redis health
      */
     healthCheck(): Promise<RedisHealth>;
+    /**
+     * Get Redis client for direct operations
+     * Returns null if Redis is not available
+     */
+    getClient(): Redis | null;
     /**
      * Rate limiting - distributed token bucket
      * Returns true if request is allowed, false if rate limit exceeded

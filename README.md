@@ -451,6 +451,105 @@ Environment variables for Discord notifications:
 - `DISCORD_DIGEST_CHANNEL_ID`: Channel for digest summaries
 - `DISCORD_ADMIN_CHANNEL_ID`: Channel for admin escalations
 
+## Discord Bot/App Integration
+
+ShadowFlower can also operate as a Discord bot/app for private moderator/admin use, allowing trusted moderators to interact with ShadowFlower from Discord.
+
+### Discord Bot Features
+
+**Slash Commands Only:**
+- `/shadowflower status` - Service health status
+- `/shadowflower queue` - Moderation queue summary
+- `/shadowflower summary <report_id>` - AI advisory summary for a specific report
+- `/shadowflower review <report_id>` - Mark report as reviewed
+- `/shadowflower dismiss <report_id>` - Dismiss a report
+- `/shadowflower escalate <report_id>` - Escalate report for admin review
+
+**Security Features:**
+- Discord signature verification (Ed25519) for all interactions
+- Permission allowlists (guild, channel, role, user restrictions)
+- Redis replay protection for duplicate interactions
+- Ephemeral responses for sensitive commands
+- No general chatbot behavior or message listening
+
+### Discord Bot Setup
+
+1. **Create Discord Application:**
+   - Go to [Discord Developer Portal](https://discord.com/developers/applications)
+   - Create a new application
+   - Enable bot functionality
+   - Copy Application ID, Public Key, and Bot Token
+
+2. **Configure Environment Variables:**
+   ```bash
+   DISCORD_APPLICATION_ID=your_application_id
+   DISCORD_PUBLIC_KEY=your_public_key
+   DISCORD_BOT_TOKEN=your_bot_token
+   DISCORD_ALLOWED_GUILD_ID=your_guild_id
+   DISCORD_ALLOWED_CHANNEL_IDS=channel_id_1,channel_id_2
+   DISCORD_ALLOWED_ROLE_IDS=role_id_1,role_id_2
+   DISCORD_ALLOWED_USER_IDS=user_id_1,user_id_2
+   ```
+
+3. **Set Interaction Endpoint:**
+   - In Discord Developer Portal, set the interaction URL to:
+   - `https://your-shadowflower-url.vercel.app/api/discord/interactions`
+
+4. **Register Slash Commands:**
+   - Use Discord API to register slash commands
+   - Configure command permissions for restricted access
+
+### Discord Bot Configuration
+
+Environment variables for Discord bot:
+
+- `DISCORD_APPLICATION_ID`: Discord Application ID (required for slash commands)
+- `DISCORD_PUBLIC_KEY`: Discord Public Key (required for signature verification)
+- `DISCORD_BOT_TOKEN`: Discord Bot Token (required for bot functionality)
+- `DISCORD_ALLOWED_GUILD_ID`: Restrict bot to specific guild (recommended)
+- `DISCORD_ALLOWED_CHANNEL_IDS`: Comma-separated channel IDs for command access
+- `DISCORD_ALLOWED_ROLE_IDS`: Comma-separated role IDs for command access
+- `DISCORD_ALLOWED_USER_IDS`: Comma-separated user IDs for admin override
+
+### Security Model
+
+**Discord Signature Verification:**
+- All Discord interactions verified using Ed25519 public key
+- Rejects unsigned or invalid signatures
+- Prevents replay attacks with Redis nonce tracking
+
+**Permission Enforcement:**
+- Server-side validation of guild, channel, role, and user permissions
+- Rejects unauthorized command attempts
+- Configurable allowlists for fine-grained access control
+
+**Command Safety:**
+- Read-mostly operations (status, queue, summary)
+- Low-risk state changes (review, dismiss, escalate) only if supported by GameDin
+- No destructive actions (deletion, banning, account mutations)
+- Human review central - GameDin remains source of truth
+
+**Response Behavior:**
+- Ephemeral responses for sensitive moderation commands
+- Minimal output to avoid leaking internal state
+- Report IDs, status, and AI summaries presented cleanly
+
+### Current Limitations
+
+**Discord Bot (v1):**
+- Slash command handlers are placeholders with TODO comments
+- GameDin integration for commands not yet implemented
+- Proper Ed25519 verification needs `@noble/ed25519` library (currently using HMAC fallback)
+- Role-based permission checking requires Discord API calls (not yet implemented)
+- Commands return "not yet implemented" messages
+
+**What Requires Implementation:**
+- Integrate slash commands with GameDin client patterns
+- Install `@noble/ed25519` for proper signature verification
+- Implement Discord API calls for role-based permission checking
+- Add command cooldowns and rate limiting
+- Implement proper error handling for GameDin integration failures
+
 ## Security Model
 
 ### Private Service Posture
