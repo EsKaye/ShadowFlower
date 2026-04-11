@@ -1,4 +1,4 @@
-# 🌸 ShadowFlower Council
+# 🌸 ShadowFlower
 
 Public nexus for the MK World Wide constellation. This repository hosts shared documentation, rituals, and prompts while coordinating autonomous guardian branches that evolve the ecosystem.
 
