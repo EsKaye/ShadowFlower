@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "vercel dev",
-    "build": "tsc && mkdir -p dist/api/discord && cp dist/routes/api/discord/interactions.js dist/api/discord/interactions.js",
+    "build": "tsc",
     "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
