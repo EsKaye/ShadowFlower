@@ -536,17 +536,13 @@ Environment variables for Discord bot:
 
 ### Current Limitations
 
-**Discord Bot (v1):**
-- Slash command handlers are placeholders with TODO comments
-- GameDin integration for commands not yet implemented
-- Proper Ed25519 verification needs `@noble/ed25519` library (currently using HMAC fallback)
-- Role-based permission checking requires Discord API calls (not yet implemented)
-- Commands return "not yet implemented" messages
+**Discord Bot (v2):**
+- Role-based permission checking requires Discord API calls (not yet implemented - logged warning if configured)
+- Commands rely on GameDin API availability
+- No command cooldowns or rate limiting (relies on Redis replay protection only)
 
 **What Requires Implementation:**
-- Integrate slash commands with GameDin client patterns
-- Install `@noble/ed25519` for proper signature verification
-- Implement Discord API calls for role-based permission checking
+- Implement Discord API calls for role-based permission checking (requires bot token and Discord API integration)
 - Add command cooldowns and rate limiting
 - Implement proper error handling for GameDin integration failures
 

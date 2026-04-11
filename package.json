@@ -21,8 +21,9 @@
   "author": "GameDin",
   "license": "MIT",
   "dependencies": {
-    "@vercel/node": "^3.0.0",
+    "@noble/ed25519": "^3.0.1",
     "@upstash/redis": "^1.34.3",
+    "@vercel/node": "^3.0.0",
     "axios": "^1.6.0"
   },
   "devDependencies": {

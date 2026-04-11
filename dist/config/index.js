@@ -95,6 +95,30 @@ function getEnvironmentConfig() {
             console.warn(`Secret validation warning: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
+    // Validate Discord bot token if configured (production only)
+    if (process.env['DISCORD_BOT_TOKEN']) {
+        try {
+            validateSecretStrength(process.env['DISCORD_BOT_TOKEN'], 'DISCORD_BOT_TOKEN');
+        }
+        catch (error) {
+            if (process.env['NODE_ENV'] === 'production') {
+                throw error;
+            }
+            console.warn(`Discord bot token validation warning: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    // Validate Discord public key format if configured
+    if (process.env['DISCORD_PUBLIC_KEY']) {
+        const publicKey = process.env['DISCORD_PUBLIC_KEY'];
+        // Discord public keys are 64 hex characters (32 bytes)
+        if (!/^[a-fA-F0-9]{64}$/.test(publicKey)) {
+            const error = new Error('DISCORD_PUBLIC_KEY must be a 64-character hex string');
+            if (process.env['NODE_ENV'] === 'production') {
+                throw error;
+            }
+            console.warn(`Discord public key validation warning: ${error.message}`);
+        }
+    }
     // Discord bot configuration (optional)
     if (process.env['DISCORD_APPLICATION_ID']) {
         config.discordApplicationId = process.env['DISCORD_APPLICATION_ID'];

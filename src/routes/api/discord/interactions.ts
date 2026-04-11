@@ -13,6 +13,7 @@ import {
   DiscordInteractionResponse,
 } from '../../../types/discord';
 import { getRedisService } from '../../../infrastructure/redis';
+import { GameDinClient } from '../../../lib/gamedin-client';
 
 /**
  * Discord interaction handler
@@ -154,8 +155,18 @@ async function checkPermissions(
     }
   }
 
-  // TODO: Check role IDs if configured (requires fetching guild member data)
-  // This would need Discord API calls which are not implemented yet
+  // Check role IDs if configured
+  // Note: Role-based permission enforcement requires Discord API calls to fetch guild member data
+  // This is not implemented in this pass as it requires:
+  // - Using DISCORD_BOT_TOKEN to make Discord API requests
+  // - Fetching guild member: GET /guilds/{guild.id}/members/{user.id}
+  // - Comparing member.roles with allowed role IDs
+  // This is scaffolded for future implementation when Discord API integration is added
+  if (environment.discordAllowedRoleIds) {
+    // Role enforcement not implemented - requires Discord API calls
+    // Current enforcement relies on guild, channel, and user ID checks which are sufficient for most use cases
+    console.warn('Role-based permission enforcement configured but not implemented (requires Discord API calls)');
+  }
 
   return true;
 }
@@ -214,26 +225,52 @@ async function handleStatusCommand(
  */
 async function handleQueueCommand(
   _interaction: DiscordInteraction,
-  _config: ReturnType<typeof getConfig>
+  config: ReturnType<typeof getConfig>
 ): Promise<DiscordInteractionResponse> {
-  // TODO: Integrate with GameDin to fetch queue information
-  return {
-    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-    data: {
-      content: 'Queue information not yet implemented',
-      flags: 64, // Ephemeral
-    },
-  };
+  try {
+    const clientConfig: { baseUrl: string; apiKey: string; signingSecret?: string } = {
+      baseUrl: config.environment.gamedinBaseUrl,
+      apiKey: config.environment.gamedinShadowflowerApiKey,
+    };
+
+    if (process.env['GAMEDIN_SIGNING_SECRET']) {
+      clientConfig.signingSecret = process.env['GAMEDIN_SIGNING_SECRET'];
+    }
+
+    const gameDinClient = new GameDinClient(clientConfig);
+
+    const queue = await gameDinClient.fetchModerationQueue({ limit: 10 });
+
+    const itemCount = queue.items?.length || 0;
+    const content = `Moderation Queue: ${itemCount} items pending`;
+
+    return {
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: {
+        content,
+        flags: 64, // Ephemeral
+      },
+    };
+  } catch (error) {
+    console.error('Failed to fetch queue:', error);
+    return {
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: {
+        content: 'Failed to fetch queue information',
+        flags: 64, // Ephemeral
+      },
+    };
+  }
 }
 
 /**
  * Handle /shadowflower summary command
  */
 async function handleSummaryCommand(
-  _interaction: DiscordInteraction,
-  _config: ReturnType<typeof getConfig>
+  interaction: DiscordInteraction,
+  config: ReturnType<typeof getConfig>
 ): Promise<DiscordInteractionResponse> {
-  const reportId = _interaction.data?.options?.find((opt: { name: string }) => opt.name === 'report_id')?.value as string;
+  const reportId = interaction.data?.options?.find((opt: { name: string }) => opt.name === 'report_id')?.value as string;
 
   if (!reportId) {
     return {
@@ -245,24 +282,49 @@ async function handleSummaryCommand(
     };
   }
 
-  // TODO: Integrate with GameDin to fetch report summary
-  return {
-    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-    data: {
-      content: `Summary for report ${reportId} not yet implemented`,
-      flags: 64, // Ephemeral
-    },
-  };
+  try {
+    const clientConfig: { baseUrl: string; apiKey: string; signingSecret?: string } = {
+      baseUrl: config.environment.gamedinBaseUrl,
+      apiKey: config.environment.gamedinShadowflowerApiKey,
+    };
+
+    if (process.env['GAMEDIN_SIGNING_SECRET']) {
+      clientConfig.signingSecret = process.env['GAMEDIN_SIGNING_SECRET'];
+    }
+
+    const gameDinClient = new GameDinClient(clientConfig);
+
+    const item = await gameDinClient.getModerationItem(reportId);
+
+    const content = `Report ${reportId}: Type ${item.type}, Author ${item.author.username}`;
+
+    return {
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: {
+        content,
+        flags: 64, // Ephemeral
+      },
+    };
+  } catch (error) {
+    console.error('Failed to fetch report summary:', error);
+    return {
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: {
+        content: `Report ${reportId} not found or failed to fetch`,
+        flags: 64, // Ephemeral
+      },
+    };
+  }
 }
 
 /**
  * Handle /shadowflower review command
  */
 async function handleReviewCommand(
-  _interaction: DiscordInteraction,
-  _config: ReturnType<typeof getConfig>
+  interaction: DiscordInteraction,
+  config: ReturnType<typeof getConfig>
 ): Promise<DiscordInteractionResponse> {
-  const reportId = _interaction.data?.options?.find((opt: { name: string }) => opt.name === 'report_id')?.value as string;
+  const reportId = interaction.data?.options?.find((opt: { name: string }) => opt.name === 'report_id')?.value as string;
 
   if (!reportId) {
     return {
@@ -274,24 +336,47 @@ async function handleReviewCommand(
     };
   }
 
-  // TODO: Integrate with GameDin to mark report as reviewed
-  return {
-    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-    data: {
-      content: `Review action for report ${reportId} not yet implemented`,
-      flags: 64, // Ephemeral
-    },
-  };
+  try {
+    const clientConfig: { baseUrl: string; apiKey: string; signingSecret?: string } = {
+      baseUrl: config.environment.gamedinBaseUrl,
+      apiKey: config.environment.gamedinShadowflowerApiKey,
+    };
+
+    if (process.env['GAMEDIN_SIGNING_SECRET']) {
+      clientConfig.signingSecret = process.env['GAMEDIN_SIGNING_SECRET'];
+    }
+
+    const gameDinClient = new GameDinClient(clientConfig);
+
+    await gameDinClient.updateModerationItemStatus(reportId, 'reviewed');
+
+    return {
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: {
+        content: `Report ${reportId} marked as reviewed`,
+        flags: 64, // Ephemeral
+      },
+    };
+  } catch (error) {
+    console.error('Failed to mark report as reviewed:', error);
+    return {
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: {
+        content: `Failed to mark report ${reportId} as reviewed`,
+        flags: 64, // Ephemeral
+      },
+    };
+  }
 }
 
 /**
  * Handle /shadowflower dismiss command
  */
 async function handleDismissCommand(
-  _interaction: DiscordInteraction,
-  _config: ReturnType<typeof getConfig>
+  interaction: DiscordInteraction,
+  config: ReturnType<typeof getConfig>
 ): Promise<DiscordInteractionResponse> {
-  const reportId = _interaction.data?.options?.find((opt: { name: string }) => opt.name === 'report_id')?.value as string;
+  const reportId = interaction.data?.options?.find((opt: { name: string }) => opt.name === 'report_id')?.value as string;
 
   if (!reportId) {
     return {
@@ -303,24 +388,47 @@ async function handleDismissCommand(
     };
   }
 
-  // TODO: Integrate with GameDin to dismiss report
-  return {
-    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-    data: {
-      content: `Dismiss action for report ${reportId} not yet implemented`,
-      flags: 64, // Ephemeral
-    },
-  };
+  try {
+    const clientConfig: { baseUrl: string; apiKey: string; signingSecret?: string } = {
+      baseUrl: config.environment.gamedinBaseUrl,
+      apiKey: config.environment.gamedinShadowflowerApiKey,
+    };
+
+    if (process.env['GAMEDIN_SIGNING_SECRET']) {
+      clientConfig.signingSecret = process.env['GAMEDIN_SIGNING_SECRET'];
+    }
+
+    const gameDinClient = new GameDinClient(clientConfig);
+
+    await gameDinClient.updateModerationItemStatus(reportId, 'dismissed');
+
+    return {
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: {
+        content: `Report ${reportId} dismissed`,
+        flags: 64, // Ephemeral
+      },
+    };
+  } catch (error) {
+    console.error('Failed to dismiss report:', error);
+    return {
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: {
+        content: `Failed to dismiss report ${reportId}`,
+        flags: 64, // Ephemeral
+      },
+    };
+  }
 }
 
 /**
  * Handle /shadowflower escalate command
  */
 async function handleEscalateCommand(
-  _interaction: DiscordInteraction,
-  _config: ReturnType<typeof getConfig>
+  interaction: DiscordInteraction,
+  config: ReturnType<typeof getConfig>
 ): Promise<DiscordInteractionResponse> {
-  const reportId = _interaction.data?.options?.find((opt: { name: string }) => opt.name === 'report_id')?.value as string;
+  const reportId = interaction.data?.options?.find((opt: { name: string }) => opt.name === 'report_id')?.value as string;
 
   if (!reportId) {
     return {
@@ -332,12 +440,35 @@ async function handleEscalateCommand(
     };
   }
 
-  // TODO: Integrate with GameDin to escalate report
-  return {
-    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-    data: {
-      content: `Escalate action for report ${reportId} not yet implemented`,
-      flags: 64, // Ephemeral
-    },
-  };
+  try {
+    const clientConfig: { baseUrl: string; apiKey: string; signingSecret?: string } = {
+      baseUrl: config.environment.gamedinBaseUrl,
+      apiKey: config.environment.gamedinShadowflowerApiKey,
+    };
+
+    if (process.env['GAMEDIN_SIGNING_SECRET']) {
+      clientConfig.signingSecret = process.env['GAMEDIN_SIGNING_SECRET'];
+    }
+
+    const gameDinClient = new GameDinClient(clientConfig);
+
+    await gameDinClient.updateModerationItemStatus(reportId, 'escalated');
+
+    return {
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: {
+        content: `Report ${reportId} escalated`,
+        flags: 64, // Ephemeral
+      },
+    };
+  } catch (error) {
+    console.error('Failed to escalate report:', error);
+    return {
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: {
+        content: `Failed to escalate report ${reportId}`,
+        flags: 64, // Ephemeral
+      },
+    };
+  }
 }

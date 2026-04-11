@@ -3,7 +3,7 @@
  * Discord uses Ed25519 for verifying interaction requests from their servers
  */
 
-import crypto from 'crypto';
+import { verify } from '@noble/ed25519';
 
 export interface DiscordVerificationConfig {
   publicKey: string;
@@ -12,8 +12,7 @@ export interface DiscordVerificationConfig {
 /**
  * Verify Discord interaction signature using Ed25519
  * Discord sends X-Signature-Ed25519 and X-Signature-Timestamp headers
- * Note: This requires a proper Ed25519 verification library.
- * For now, this is a placeholder that needs @noble/ed25519 or similar library.
+ * Uses @noble/ed25519 for proper cryptographic verification
  */
 export function verifyDiscordSignature(config: DiscordVerificationConfig, params: {
   body: string;
@@ -26,34 +25,14 @@ export function verifyDiscordSignature(config: DiscordVerificationConfig, params
   try {
     // Discord verification: signature = Ed25519(publicKey, timestamp + body)
     const message = timestamp + body;
+    const messageBytes = new TextEncoder().encode(message);
     const signatureBytes = Buffer.from(signature, 'hex');
+    const publicKeyBytes = Buffer.from(publicKey, 'hex');
 
-    // Note: Node.js crypto.verify doesn't support Ed25519 directly
-    // This requires @noble/ed25519 or similar library for proper verification
-    // For now, we'll use a basic HMAC fallback for development
-    // TODO: Install @noble/ed25519 and implement proper Ed25519 verification
+    // Verify using Ed25519
+    const isValid = verify(publicKeyBytes, messageBytes, signatureBytes);
 
-    // Fallback: Use HMAC-SHA256 for development (not production-secure)
-    const hmac = crypto.createHmac('sha256', publicKey);
-    hmac.update(message);
-    const expectedSignature = hmac.digest('hex');
-
-    // Constant-time comparison
-    const expectedBytes = Buffer.from(expectedSignature, 'hex');
-    const providedBytes = signatureBytes;
-
-    if (expectedBytes.length !== providedBytes.length) {
-      return false;
-    }
-
-    let result = 0;
-    for (let i = 0; i < expectedBytes.length; i++) {
-      const expectedByte = expectedBytes[i] ?? 0;
-      const providedByte = providedBytes[i] ?? 0;
-      result |= expectedByte ^ providedByte;
-    }
-
-    return result === 0;
+    return isValid;
   } catch (error) {
     console.error('Discord signature verification failed:', error);
     return false;
