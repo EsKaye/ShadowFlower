@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/src/routes/api/$1"
+      "destination": "/routes/api/$1"
     }
   ],
   "env": {
