@@ -60,10 +60,18 @@ ShadowFlower is a backend moderation and trust/safety service for GameDin.xyz, d
 
 ## Current State
 
-The system is fully implemented and ready for production deployment with:
-- Complete TypeScript implementation
-- Vercel deployment configuration
+The system is a development scaffold requiring testing and validation before production deployment:
+- TypeScript implementation builds cleanly
+- Vercel deployment structure configured for root deployment
 - Comprehensive documentation
-- Security middleware
-- Provider abstraction with Gemini implementation
+- Security middleware with API key authentication
+- Provider abstraction with Gemini implementation (untested with real API)
 - Full API surface (health, job execution, dry-run)
+- Rate limiting is in-memory only (not production-grade)
+- CORS configuration requires ALLOWED_ORIGIN environment variable
+
+**Known Limitations:**
+- Provider integration not validated against real AI provider APIs
+- GameDin client not tested against actual GameDin endpoints
+- In-memory rate limiting resets on function restart
+- Security middleware requires proper environment configuration

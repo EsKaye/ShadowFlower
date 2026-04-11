@@ -18,6 +18,41 @@ Backend moderation and trust/safety service for GameDin.xyz. ShadowFlower is a l
 - **Full Platform**: Not a comprehensive moderation dashboard
 - **Monolith**: Lightweight and focused, not over-engineered
 
+## Current Status
+
+### Development Scaffold - Requires Testing and Validation
+
+ShadowFlower is currently a development scaffold with the following characteristics:
+
+**What Works:**
+- TypeScript implementation builds cleanly
+- Vercel deployment structure configured for root deployment
+- API endpoints properly structured and protected
+- Security middleware with API key authentication
+- Provider abstraction interface implemented
+- GameDin HTTP client wrapper implemented
+
+**What Requires Validation:**
+- Provider integration not tested against real AI provider APIs
+- GameDin client not tested against actual GameDin endpoints
+- End-to-end moderation workflow not validated
+- Environment configuration not tested in deployment
+- Error handling not tested in production scenarios
+
+**Known Limitations:**
+- Rate limiting is in-memory only (resets on function restart)
+- CORS configuration requires ALLOWED_ORIGIN environment variable
+- No persistent storage for rate limiting or request tracking
+- Security middleware assumes proper environment configuration
+
+**Before Production Deployment:**
+- Test provider integration with real AI provider APIs
+- Validate GameDin client against actual GameDin endpoints
+- Implement production-grade rate limiting with persistent storage
+- Add comprehensive integration tests
+- Validate error handling in production scenarios
+- Set up monitoring and alerting
+
 ## Architecture
 
 ### Core Components
@@ -62,6 +97,7 @@ All protected endpoints require `x-shadowflower-api-key` header.
 GAMEDIN_BASE_URL=https://api.gamedin.xyz
 SHADOWFLOWER_API_KEY=your_shadowflower_api_key
 GAMEDIN_SHADOWFLOWER_API_KEY=your_gamedin_shadowflower_api_key
+ALLOWED_ORIGIN=http://localhost:3000
 ```
 
 ### Optional
@@ -220,6 +256,14 @@ X-Service: shadowflower
 4. **Server-to-server only** - no user session dependencies
 5. **Rate limiting** and request validation
 6. **Minimal logging** of sensitive data
+7. **CORS restriction** - configure ALLOWED_ORIGIN for production
+
+### Current Limitations
+
+- **Rate limiting** is in-memory only (resets on function restart)
+- **Provider integration** not validated against real AI provider APIs
+- **GameDin client** not tested against actual GameDin endpoints
+- **Security middleware** requires proper environment configuration
 
 ## Provider Configuration
 
@@ -325,4 +369,4 @@ Report security vulnerabilities through private channels only. Do not open publi
 
 **License**: MIT License  
 **Version**: 1.0.0  
-**Deployable**: Root-level Vercel deployment
+**Status**: Development scaffold - requires testing and validation before production deployment

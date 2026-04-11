@@ -1,0 +1,115 @@
+/**
+ * GameDin client wrapper for HTTP integration
+ */
+import axios from 'axios';
+export class GameDinClient {
+    client;
+    config;
+    constructor(config) {
+        this.config = config;
+        this.client = axios.create({
+            baseURL: config.baseUrl,
+            timeout: config.timeout || 10000,
+        });
+        // Set headers separately to avoid type issues
+        const authHeaders = this.getAuthHeaders();
+        Object.entries(authHeaders).forEach(([key, value]) => {
+            this.client.defaults.headers.common[key] = value;
+        });
+        // Add response interceptor for error handling
+        this.client.interceptors.response.use((response) => response, (error) => {
+            throw new Error(`GameDin API error: ${error.response?.data?.message || error.message}`);
+        });
+    }
+    /**
+     * Fetch moderation queue from GameDin
+     */
+    async fetchModerationQueue(options = {}) {
+        try {
+            const response = await this.client.get('/api/internal/moderation/queue', {
+                params: {
+                    limit: options.limit || 50,
+                    offset: options.offset || 0,
+                    itemType: options.itemType,
+                },
+            });
+            return response.data;
+        }
+        catch (error) {
+            throw new Error(`Failed to fetch moderation queue: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Send moderation advisory results back to GameDin
+     */
+    async sendAdvisoryResults(payload) {
+        try {
+            await this.client.post('/api/internal/moderation/advisory', payload);
+        }
+        catch (error) {
+            throw new Error(`Failed to send advisory results: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Get specific moderation item by ID
+     */
+    async getModerationItem(itemId) {
+        try {
+            const response = await this.client.get(`/api/internal/moderation/items/${itemId}`);
+            return response.data;
+        }
+        catch (error) {
+            throw new Error(`Failed to fetch moderation item: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Update moderation item status (if needed)
+     */
+    async updateModerationItemStatus(itemId, status) {
+        try {
+            await this.client.patch(`/api/internal/moderation/items/${itemId}`, {
+                status,
+                updatedAt: new Date().toISOString(),
+            });
+        }
+        catch (error) {
+            throw new Error(`Failed to update moderation item: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+    /**
+     * Health check for GameDin service
+     */
+    async healthCheck() {
+        try {
+            const response = await this.client.get('/api/internal/health');
+            return response.status === 200;
+        }
+        catch {
+            return false;
+        }
+    }
+    /**
+     * Get authentication headers for server-to-server communication
+     */
+    getAuthHeaders() {
+        return {
+            'authorization': `Bearer ${this.config.apiKey}`,
+            'x-service': 'shadowflower',
+            'content-type': 'application/json',
+        };
+    }
+    /**
+     * Update client configuration (useful for testing)
+     */
+    updateConfig(newConfig) {
+        this.config = { ...this.config, ...newConfig };
+        this.client.defaults.baseURL = this.config.baseUrl;
+        this.client.defaults.timeout = this.config.timeout || 10000;
+        // Set headers separately to avoid type issues
+        const authHeaders = this.getAuthHeaders();
+        Object.entries(authHeaders).forEach(([key, value]) => {
+            this.client.defaults.headers.common[key] = value;
+        });
+    }
+}
+//# sourceMappingURL=gamedin-client.js.map
