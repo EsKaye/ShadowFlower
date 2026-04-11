@@ -12,6 +12,7 @@ export interface ModerationJobOptions {
 export declare class ModerationPipeline {
     private gamedinClient;
     private config;
+    private discordNotifier;
     constructor(gamedinClient: GameDinClient);
     /**
      * Run a moderation job

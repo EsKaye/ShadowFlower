@@ -4,6 +4,30 @@
 
 import { ServiceConfig, EnvironmentConfig, ModerationConfig } from '../types';
 
+/**
+ * Validate secret strength
+ * Ensures secrets meet minimum security requirements
+ */
+function validateSecretStrength(secret: string, secretName: string): void {
+  const minLength = 32;
+  const hasUpperCase = /[A-Z]/.test(secret);
+  const hasLowerCase = /[a-z]/.test(secret);
+  const hasNumbers = /\d/.test(secret);
+  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(secret);
+
+  if (secret.length < minLength) {
+    throw new Error(
+      `${secretName} must be at least ${minLength} characters long (current: ${secret.length})`
+    );
+  }
+
+  if (!hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecialChar) {
+    throw new Error(
+      `${secretName} must contain uppercase, lowercase, numbers, and special characters`
+    );
+  }
+}
+
 function getEnvironmentConfig(): EnvironmentConfig {
   const config: EnvironmentConfig = {
     gamedinBaseUrl: process.env['GAMEDIN_BASE_URL'] || '',
@@ -23,9 +47,45 @@ function getEnvironmentConfig(): EnvironmentConfig {
   // Validate required environment variables
   const requiredVars = ['gamedinBaseUrl', 'shadowflowerApiKey', 'gamedinShadowflowerApiKey'];
   const missingVars = requiredVars.filter(varName => !config[varName as keyof EnvironmentConfig]);
-  
+
   if (missingVars.length > 0) {
     throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+  }
+
+  // Validate secret strength
+  try {
+    validateSecretStrength(config.shadowflowerApiKey, 'SHADOWFLOWER_API_KEY');
+    validateSecretStrength(config.gamedinShadowflowerApiKey, 'GAMEDIN_SHADOWFLOWER_API_KEY');
+  } catch (error) {
+    if (process.env['NODE_ENV'] === 'production') {
+      throw error;
+    }
+    // In development, warn but don't fail
+    console.warn(`Secret validation warning: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+
+  // Validate optional signing secret if configured
+  if (process.env['SHADOWFLOWER_SIGNING_SECRET']) {
+    try {
+      validateSecretStrength(process.env['SHADOWFLOWER_SIGNING_SECRET'], 'SHADOWFLOWER_SIGNING_SECRET');
+    } catch (error) {
+      if (process.env['NODE_ENV'] === 'production') {
+        throw error;
+      }
+      console.warn(`Secret validation warning: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Validate optional admin key if configured
+  if (process.env['SHADOWFLOWER_ADMIN_KEY']) {
+    try {
+      validateSecretStrength(process.env['SHADOWFLOWER_ADMIN_KEY'], 'SHADOWFLOWER_ADMIN_KEY');
+    } catch (error) {
+      if (process.env['NODE_ENV'] === 'production') {
+        throw error;
+      }
+      console.warn(`Secret validation warning: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   return config;
@@ -50,4 +110,4 @@ export function getConfig(): ServiceConfig {
 }
 
 // Export individual configs for convenience
-export { getEnvironmentConfig, getModerationConfig };
+export { getEnvironmentConfig, getModerationConfig, validateSecretStrength };

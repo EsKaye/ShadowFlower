@@ -11,11 +11,18 @@ function generateUUID() {
 }
 import { providerRegistry } from '../providers';
 import { getConfig } from '../config';
+import { DiscordNotifier } from '../notifications/discord';
 export class ModerationPipeline {
     gamedinClient;
     config = getConfig();
+    discordNotifier = null;
     constructor(gamedinClient) {
         this.gamedinClient = gamedinClient;
+        // Initialize Discord notifier if webhook URL is configured
+        const webhookUrl = process.env['DISCORD_WEBHOOK_URL'];
+        if (webhookUrl) {
+            this.discordNotifier = new DiscordNotifier({ webhookUrl });
+        }
     }
     /**
      * Run a moderation job
@@ -53,6 +60,20 @@ export class ModerationPipeline {
             }
             const completedAt = new Date().toISOString();
             const duration = new Date(completedAt).getTime() - new Date(startedAt).getTime();
+            // Send Discord notification for batch completion
+            if (this.discordNotifier && !dryRun) {
+                const summary = this.calculateSummary(results);
+                await this.discordNotifier.notifyBatchCompleted({
+                    jobId,
+                    itemsProcessed: summary.totalProcessed,
+                    itemsApproved: summary.approved,
+                    itemsReviewed: summary.needsReview,
+                    itemsEscalated: summary.escalated,
+                    duration,
+                }).catch((err) => {
+                    console.error('Failed to send Discord batch completion notification:', err);
+                });
+            }
             return {
                 results,
                 summary: this.calculateSummary(results),
@@ -69,6 +90,16 @@ export class ModerationPipeline {
         }
         catch (error) {
             console.error(`Moderation job ${jobId} failed:`, error);
+            // Send Discord notification for batch failure
+            if (this.discordNotifier) {
+                await this.discordNotifier.notifyBatchFailed({
+                    jobId,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    itemsProcessed: 0, // Unknown at failure time
+                }).catch((err) => {
+                    console.error('Failed to send Discord batch failure notification:', err);
+                });
+            }
             throw error;
         }
     }

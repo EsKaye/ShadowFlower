@@ -59,4 +59,10 @@ export declare function validateAdminKey(request: VercelRequest): boolean;
  * Returns 404 instead of 401 if key is invalid to avoid revealing admin endpoints
  */
 export declare function requireAdmin(handler: (req: AuthenticatedRequest, res: VercelResponse) => Promise<void> | void): (req: AuthenticatedRequest, res: VercelResponse) => Promise<void>;
+/**
+ * Optional HMAC signature verification middleware
+ * Verifies HMAC-SHA256 signatures for enhanced inter-service security
+ * Returns 401 if signature verification fails
+ */
+export declare function requireSignature(handler: (req: AuthenticatedRequest, res: VercelResponse) => Promise<void> | void): (req: AuthenticatedRequest, res: VercelResponse) => Promise<void>;
 //# sourceMappingURL=auth.d.ts.map

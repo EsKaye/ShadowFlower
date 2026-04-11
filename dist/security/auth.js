@@ -2,7 +2,8 @@
  * Authentication and security middleware for ShadowFlower service
  */
 import { getConfig } from '../config';
-import { logAuthSuccess, logAuthFailure, logCorsRejected, logAdminAuthSuccess, logAdminAuthFailure, logRateLimitExceeded, } from './audit-logger';
+import { logAuthSuccess, logAuthFailure, logCorsRejected, logAdminAuthSuccess, logAdminAuthFailure, logRateLimitExceeded, logSignatureVerificationSuccess, logSignatureVerificationFailure, } from './audit-logger';
+import { verifySignature, extractSignatureHeaders, } from './signing';
 /**
  * Get CORS configuration from environment
  */
@@ -220,6 +221,60 @@ export function requireAdmin(handler) {
             return;
         }
         logAdminAuthSuccess({ requestId, clientId });
+        await handler(req, res);
+    };
+}
+/**
+ * Optional HMAC signature verification middleware
+ * Verifies HMAC-SHA256 signatures for enhanced inter-service security
+ * Returns 401 if signature verification fails
+ */
+export function requireSignature(handler) {
+    return async (req, res) => {
+        const requestId = generateRequestId();
+        req.requestId = requestId;
+        const clientId = req.headers['x-forwarded-for'] ||
+            req.headers['x-real-ip'] ||
+            'unknown';
+        const signingSecret = process.env['SHADOWFLOWER_SIGNING_SECRET'];
+        // If signing secret is not configured, skip signature verification
+        if (!signingSecret) {
+            await handler(req, res);
+            return;
+        }
+        // Extract signature headers
+        const signatureHeaders = extractSignatureHeaders(req);
+        // Get request body for signature verification
+        const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
+        // Verify signature
+        const signingConfig = {
+            secretKey: signingSecret,
+            maxTimestampDelta: 5 * 60 * 1000, // 5 minutes
+        };
+        const verification = verifySignature(signingConfig, {
+            method: req.method || 'GET',
+            path: req.url || '/',
+            body,
+            headers: signatureHeaders,
+        });
+        if (!verification.valid) {
+            const logParams = {
+                requestId,
+                clientId,
+            };
+            if (verification.reason) {
+                logParams.reason = verification.reason;
+            }
+            logSignatureVerificationFailure(logParams);
+            res.status(401).json({
+                error: 'Unauthorized',
+                message: 'Invalid signature',
+                timestamp: new Date().toISOString(),
+                requestId,
+            });
+            return;
+        }
+        logSignatureVerificationSuccess({ requestId, clientId });
         await handler(req, res);
     };
 }
