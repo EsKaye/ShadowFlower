@@ -2,13 +2,21 @@
  * Moderation job pipeline for processing content
  */
 
-import { v4 as uuidv4 } from 'uuid';
 import { 
   ModerationItem, 
   ModerationOutput, 
   ModerationResult,
   ProviderConfig 
 } from '../types';
+
+// Simple UUID generator using crypto
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 import { GameDinClient } from '../lib/gamedin-client';
 import { providerRegistry } from '../providers';
 import { getConfig } from '../config';
@@ -32,7 +40,7 @@ export class ModerationPipeline {
    * Run a moderation job
    */
   async runJob(options: ModerationJobOptions = {}): Promise<ModerationOutput> {
-    const jobId = uuidv4();
+    const jobId = generateUUID();
     const startedAt = new Date().toISOString();
     
     const {
