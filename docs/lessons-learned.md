@@ -69,9 +69,9 @@
 **Prevention Rule**: Validate all required environment variables at startup
 
 ### Problem: Vercel Deployment Structure Incorrect
-**Root Cause**: API routes placed in `src/routes/api/` with complex rewrites instead of using Vercel's expected `api/` directory structure
-**Fix**: Moved API routes to root `api/` directory and removed incorrect rewrites from vercel.json
-**Prevention Rule**: Follow platform-specific directory structures and conventions, avoid custom routing when platform conventions exist
+**Root Cause**: API routes placed in root `api/` directory with TypeScript files outside TypeScript include pattern, causing "Emit skipped" errors
+**Fix**: Reverted API routes to `src/routes/api/` and configured vercel.json rewrites to point to source files
+**Prevention Rule**: Keep all source code in TypeScript include pattern (src/), use vercel.json rewrites for routing instead of moving files outside build process
 
 ### Problem: CORS Wildcard Origin Security Vulnerability
 **Root Cause**: CORS configured with wildcard origin `*` allowing unrestricted access
