@@ -4,6 +4,17 @@
  */
 
 module.exports = async function handler(req, res) {
+  // Handle Discord endpoint verification (GET request with challenge)
+  if (req.method === 'GET') {
+    const challenge = req.query.challenge;
+    if (challenge) {
+      res.status(200).send(challenge);
+      return;
+    }
+    res.status(400).send('Bad request');
+    return;
+  }
+
   const publicKey = process.env.DISCORD_PUBLIC_KEY;
 
   if (!publicKey) {
