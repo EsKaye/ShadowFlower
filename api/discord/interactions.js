@@ -3,8 +3,6 @@
  * Self-contained Vercel serverless function
  */
 
-const { VercelRequest, VercelResponse } = require('@vercel/node');
-
 module.exports = async function handler(req, res) {
   const publicKey = process.env.DISCORD_PUBLIC_KEY;
 
@@ -42,7 +40,7 @@ module.exports = async function handler(req, res) {
 
       switch (commandName) {
         case 'sf_status':
-          content = 'ShadowFlower status: Operational';
+          content = 'ShadowFlower status: ✅ Operational';
           break;
         case 'sf_queue':
           content = 'Moderation Queue: 0 items pending';
