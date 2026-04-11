@@ -8,6 +8,14 @@ import {
   ModerationResult,
   ProviderConfig
 } from '../types';
+import {
+  scanTextWithRules,
+  calculateRiskScore,
+  extractCategories,
+  determineAiReviewRequired,
+  getHighestSeverity
+} from '../rules/moderation-rules';
+import { normalizeText } from '../lib/text-normalizer';
 
 // Simple UUID generator using crypto
 function generateUUID(): string {
@@ -30,6 +38,11 @@ export interface ModerationJobOptions {
   model?: string;
   idempotencyKey?: string;
   skipLock?: boolean;
+  // Incremental scanning parameters
+  unscanned?: boolean;
+  changedSince?: string;
+  reportedSince?: string;
+  fullReindex?: boolean;
 }
 
 export class ModerationPipeline {
@@ -53,7 +66,7 @@ export class ModerationPipeline {
   async runJob(options: ModerationJobOptions = {}): Promise<ModerationOutput> {
     const jobId = generateUUID();
     const startedAt = new Date().toISOString();
-    
+
     const {
       dryRun = this.config.moderation.dryRunDefault,
       batchSize = this.config.moderation.defaultBatchSize,
@@ -61,6 +74,10 @@ export class ModerationPipeline {
       model = this.config.moderation.defaultModel,
       idempotencyKey,
       skipLock = false,
+      unscanned,
+      changedSince,
+      reportedSince,
+      fullReindex = false,
     } = options;
 
     const redis = getRedisService();
@@ -90,10 +107,31 @@ export class ModerationPipeline {
 
       console.log(`[${jobId}] Starting moderation job with provider: ${provider}, model: ${model}, dryRun: ${dryRun}`);
 
-      // Fetch moderation items from GameDin
-      const queue = await this.gamedinClient.fetchModerationQueue({
+      // Build fetch options with incremental scanning filters
+      const fetchOptions: {
+        limit: number;
+        unscanned?: boolean;
+        changedSince?: string;
+        reportedSince?: string;
+      } = {
         limit: batchSize,
-      });
+      };
+
+      // Use incremental scanning unless full reindex is requested
+      if (!fullReindex) {
+        if (unscanned !== undefined) {
+          fetchOptions.unscanned = unscanned;
+        }
+        if (changedSince) {
+          fetchOptions.changedSince = changedSince;
+        }
+        if (reportedSince) {
+          fetchOptions.reportedSince = reportedSince;
+        }
+      }
+
+      // Fetch moderation items from GameDin
+      const queue = await this.gamedinClient.fetchModerationQueue(fetchOptions);
 
       if (queue.items.length === 0) {
         const emptyOutput = this.createEmptyOutput(jobId, startedAt, provider, model, dryRun);
@@ -193,29 +231,68 @@ export class ModerationPipeline {
   }
 
   /**
-   * Process moderation items through the provider
+   * Process moderation items through rule engine and optionally AI provider
    */
   private async processItems(
-    items: ModerationItem[], 
+    items: ModerationItem[],
     provider: any
   ): Promise<ModerationResult[]> {
     const results: ModerationResult[] = [];
 
     for (const item of items) {
       try {
-        const providerResponse = await provider.analyzeItem(item);
+        // Step 1: Rule-based scanning
+        const normalizedText = normalizeText(item.content);
+        const ruleMatches = scanTextWithRules(item.content, normalizedText);
+        const ruleRiskScore = calculateRiskScore(ruleMatches);
+        const matchedCategories = extractCategories(ruleMatches);
+        const aiReviewRequired = determineAiReviewRequired(ruleMatches);
+        const ruleSeverity = getHighestSeverity(ruleMatches);
+
+        // Step 2: AI escalation (only if required by policy)
+        let aiSummary = 'No AI review required';
+        let aiReason = 'Content processed with rule engine only';
+        let aiConfidence = 0;
+        let aiRecommendedAction: 'approve' | 'review' | 'escalate' | 'remove' | 'suspend' = 'approve';
+        let aiEscalateToAdmin = false;
+        let aiProvider = 'shadowflower';
+        let aiModel = 'rule-engine';
+        let aiSeverity = ruleSeverity;
+        let aiCategories: ModerationResult['categories'] = {};
+
+        if (aiReviewRequired && provider) {
+          const providerResponse = await provider.analyzeItem(item);
+          aiSummary = providerResponse.summary;
+          aiReason = providerResponse.reasoning;
+          aiConfidence = providerResponse.confidence;
+          aiRecommendedAction = providerResponse.recommendedAction;
+          aiEscalateToAdmin = providerResponse.escalateToAdmin;
+          aiProvider = provider.getProviderInfo().name;
+          aiModel = provider.getProviderInfo().models[0];
+          aiSeverity = providerResponse.severity;
+          aiCategories = providerResponse.categories;
+        }
+
         const result: ModerationResult = {
           itemId: item.id,
-          aiSummary: providerResponse.summary,
-          aiReason: providerResponse.reasoning,
-          aiConfidence: providerResponse.confidence,
-          aiRecommendedAction: providerResponse.recommendedAction,
-          aiEscalateToAdmin: providerResponse.escalateToAdmin,
-          aiProvider: provider.getProviderInfo().name,
-          aiModel: provider.getProviderInfo().models[0],
+          // AI fields
+          aiSummary,
+          aiReason,
+          aiConfidence,
+          aiRecommendedAction,
+          aiEscalateToAdmin,
+          aiProvider,
+          aiModel,
+          // Rule-based fields
+          matchedRules: ruleMatches,
+          ruleRiskScore,
+          matchedCategories,
+          ruleMatchCount: ruleMatches.length,
+          aiReviewRequired,
+          // Common fields
           processedAt: new Date().toISOString(),
-          severity: providerResponse.severity,
-          categories: providerResponse.categories,
+          severity: aiSeverity,
+          categories: aiCategories,
         };
         results.push(result);
       } catch (error) {
@@ -331,6 +408,7 @@ export class ModerationPipeline {
   private createFailedResult(itemId: string, error: string): ModerationResult {
     return {
       itemId,
+      // AI fields
       aiSummary: `Processing failed: ${error}`,
       aiReason: 'Unable to analyze content due to system error',
       aiConfidence: 0,
@@ -338,6 +416,13 @@ export class ModerationPipeline {
       aiEscalateToAdmin: true,
       aiProvider: 'shadowflower',
       aiModel: 'error',
+      // Rule-based fields
+      matchedRules: [],
+      ruleRiskScore: 0,
+      matchedCategories: [],
+      ruleMatchCount: 0,
+      aiReviewRequired: true,
+      // Common fields
       processedAt: new Date().toISOString(),
       severity: 'medium',
       categories: {

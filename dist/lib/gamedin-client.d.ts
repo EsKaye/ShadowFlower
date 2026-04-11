@@ -15,11 +15,15 @@ export declare class GameDinClient {
     constructor(config: GameDinClientConfig);
     /**
      * Fetch moderation queue from GameDin
+     * Supports filtering for incremental scanning
      */
     fetchModerationQueue(options?: {
         limit?: number;
         offset?: number;
         itemType?: string;
+        unscanned?: boolean;
+        changedSince?: string;
+        reportedSince?: string;
     }): Promise<GameDinModerationQueue>;
     /**
      * Send moderation advisory results back to GameDin

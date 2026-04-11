@@ -42,20 +42,40 @@ export class GameDinClient {
 
   /**
    * Fetch moderation queue from GameDin
+   * Supports filtering for incremental scanning
    */
   async fetchModerationQueue(options: {
     limit?: number;
     offset?: number;
     itemType?: string;
+    unscanned?: boolean;
+    changedSince?: string;
+    reportedSince?: string;
   } = {}): Promise<GameDinModerationQueue> {
     try {
-      const response = await this.client.get('/api/internal/moderation/queue', {
-        params: {
-          limit: options.limit || 50,
-          offset: options.offset || 0,
-          itemType: options.itemType,
-        },
-      });
+      const params: Record<string, string | number | boolean | undefined> = {
+        limit: options.limit || 50,
+        offset: options.offset || 0,
+      };
+
+      if (options.itemType) {
+        params['itemType'] = options.itemType;
+      }
+
+      // Incremental scanning filters
+      if (options.unscanned !== undefined) {
+        params['unscanned'] = options.unscanned;
+      }
+
+      if (options.changedSince) {
+        params['changedSince'] = options.changedSince;
+      }
+
+      if (options.reportedSince) {
+        params['reportedSince'] = options.reportedSince;
+      }
+
+      const response = await this.client.get('/api/internal/moderation/queue', { params });
 
       return response.data;
     } catch (error) {

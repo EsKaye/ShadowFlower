@@ -5,7 +5,9 @@ Backend moderation and trust/safety service for GameDin.xyz. ShadowFlower is a l
 ## What ShadowFlower Is
 
 - **Backend Service**: Server-to-server moderation API for GameDin
-- **AI-Powered**: Uses AI providers (NVIDIA Moonshot Kimi, etc.) to analyze content
+- **Async Moderation Engine**: Rule-based scanning with selective AI escalation for cost efficiency
+- **Incremental Scanning**: Processes only new or changed content to avoid wasteful full rescans
+- **AI-Powered**: Uses AI providers (Gemini, etc.) for escalated content analysis
 - **Advisory Only**: Provides recommendations, does not take autonomous destructive actions
 - **Secure**: Server-to-server authentication with proper API key management
 - **Scalable**: Batch processing with configurable limits and timeouts
@@ -14,6 +16,7 @@ Backend moderation and trust/safety service for GameDin.xyz. ShadowFlower is a l
 ## What ShadowFlower Is Not
 
 - **User-Facing**: No direct user chat or public interface
+- **Live Submit-Time Moderation**: Does NOT implement synchronous post/comment blocking - that stays in GameDin for speed and reliability
 - **Autonomous Moderator**: Does not automatically ban/delete content
 - **Social Assistant**: Not the public voice of GameDin
 - **Full Platform**: Not a comprehensive moderation dashboard
@@ -26,9 +29,11 @@ Backend moderation and trust/safety service for GameDin.xyz. ShadowFlower is a l
 ShadowFlower is a moderation-first service. The core functionality is the moderation pipeline that processes content from GameDin and provides advisory recommendations. Discord bot interactions are optional and deferred to a later pass.
 
 **Core Functionality (Active):**
-- Moderation pipeline for processing content batches
+- Rule-based moderation engine with file-based rules
+- Incremental scanning for new or changed content only
+- Selective AI escalation for suspicious content
 - GameDin integration with HMAC signing
-- AI provider abstraction (NVIDIA Moonshot Kimi, etc.)
+- AI provider abstraction (Gemini, etc.)
 - Redis-backed coordination (rate limiting, replay protection, job locking)
 - Private API endpoints for job execution
 - Server-to-server authentication
@@ -76,11 +81,13 @@ ShadowFlower is currently a development scaffold with the following characterist
 
 ### Core Components
 
-- **Provider Abstraction**: Swappable AI providers (Gemini, etc.)
-- **GameDin Client**: HTTP wrapper for GameDin API integration with HMAC signing
-- **Moderation Pipeline**: Batch processing with job locking and idempotency
+- **Rule Engine**: File-based moderation rules with categories (offensive_language, hate_abuse, harassment, nsfw_text, spam_promo, impersonation_signals, suspicious_links, other)
+- **Text Normalizer**: Normalizes text for consistent rule matching (lowercase, trim, collapse whitespace, optional punctuation stripping)
+- **Provider Abstraction**: Swappable AI providers (Gemini, etc.) for selective escalation
+- **GameDin Client**: HTTP wrapper for GameDin API integration with HMAC signing and incremental scanning filters
+- **Moderation Pipeline**: Rule-based scanning first, selective AI escalation second, incremental scanning only
 - **Security Layer**: Authentication, HMAC verification, rate limiting
-- **Infrastructure**: Upstash Redis for distributed coordination
+- **Infrastructure**: Upstash Redis for distributed coordination (ephemeral only - locks, replay protection, idempotency)
 - **API Routes**: RESTful endpoints for health checks and job execution
 
 ### Directory Structure
@@ -89,8 +96,9 @@ ShadowFlower is currently a development scaffold with the following characterist
 src/
   config/          # Environment and service configuration
   infrastructure/  # Upstash Redis wrapper for distributed coordination
-  lib/             # GameDin client and utilities
+  lib/             # GameDin client and utilities (text normalizer)
   providers/       # AI provider implementations
+  rules/           # File-based moderation rules
   jobs/            # Moderation job pipeline
   routes/          # API endpoints
   security/        # Authentication, HMAC signing, audit logging
@@ -129,6 +137,8 @@ All protected endpoints require `x-shadowflower-api-key` header.
 - `POST /api/jobs/moderation/run` - Execute moderation job (sends results to GameDin)
 - `POST /api/jobs/moderation/dry-run` - Execute moderation job in dry-run mode
 - `POST /api/jobs/moderation/schedule` - Scheduler-triggered moderation job (supports Vercel cron, QStash, or manual triggers)
+- `POST /api/jobs/moderation/rescan` - Targeted rescan with incremental filters (unscanned, changed_since, reported_since)
+- `POST /api/jobs/moderation/reindex` - Full database reindex (manual, protected, clearly labeled)
 
 ### Admin Endpoints
 
@@ -381,11 +391,60 @@ X-Service: shadowflower
 
 ### Moderation Flow
 
-1. **Fetch Queue**: ShadowFlower requests moderation items from GameDin
-2. **Analyze Content**: AI provider analyzes each item
-3. **Generate Advisory**: Creates structured recommendations
-4. **Send Results**: Posts advisory results back to GameDin
-5. **Human Review**: GameDin moderators review and take action
+1. **Fetch Queue**: ShadowFlower requests moderation items from GameDin with incremental filters (unscanned, changed_since, reported_since)
+2. **Rule-Based Scanning**: Content is scanned against file-based moderation rules
+3. **AI Escalation**: Only suspicious content (medium/high severity or multiple matches) is escalated to AI
+4. **Generate Advisory**: Creates structured recommendations with rule match data and AI analysis
+5. **Send Results**: Posts advisory results back to GameDin with scan state updates
+6. **Human Review**: GameDin moderators review and take action
+
+### Rule-Based Moderation
+
+ShadowFlower uses a file-based rule engine for first-pass content scanning:
+
+**Rule Categories:**
+- offensive_language: Strong profanity and vulgar language
+- hate_abuse: Racial, ethnic, and homophobic slurs
+- harassment: Self-harm encouragement, insults, threats
+- nsfw_text: Adult content references
+- spam_promo: Promotional language and spam patterns
+- impersonation_signals: Claims of official status
+- suspicious_links: URL shorteners and suspicious domains
+
+**Rule Types:**
+- exact: Exact term match
+- phrase: Phrase match
+- case_insensitive: Case-insensitive match
+- normalized: Match against normalized text (lowercase, trimmed, collapsed whitespace)
+- regex: Regular expression pattern
+
+**AI Escalation Policy:**
+- No rule match → No AI review
+- Low-severity match only → Advisory only, no AI
+- Medium/high-severity match → AI review candidate
+- Multiple matches (3+) → AI review candidate
+
+### Incremental Scanning
+
+ShadowFlower uses incremental scanning to avoid wasteful full-table rescans:
+
+**Default Hourly Scan:**
+- Never-scanned rows (unscanned=true)
+- Rows updated since last scan (changed_since=timestamp)
+- Recently reported rows (reported_since=timestamp)
+
+**Manual Operations:**
+- Targeted rescan with custom filters
+- Protected full reindex mode (clearly labeled)
+
+**Scan State (stored in GameDin):**
+- last_scanned_at: Timestamp of last moderation scan
+- scan_version: Version of the moderation engine
+- rule_match_count: Number of rule matches
+- matched_categories: Categories that matched
+- matched_rule_ids: Specific rules that matched
+- rule_risk_score: Calculated risk score from rule matches
+- ai_review_required: Whether AI review was needed
 
 ### Advisory Payload
 
@@ -393,6 +452,7 @@ X-Service: shadowflower
 {
   results: [{
     itemId: string,
+    // AI fields
     aiSummary: string,
     aiReason: string,
     aiConfidence: number,
@@ -400,6 +460,20 @@ X-Service: shadowflower
     aiEscalateToAdmin: boolean,
     aiProvider: string,
     aiModel: string,
+    // Rule-based fields
+    matchedRules: Array<{
+      ruleId: string,
+      category: string,
+      severity: string,
+      weight: number,
+      matchedText: string
+    }>,
+    ruleRiskScore: number,
+    matchedCategories: string[],
+    ruleMatchCount: number,
+    aiReviewRequired: boolean,
+    // Common fields
+    processedAt: string,
     severity: 'low' | 'medium' | 'high' | 'critical',
     categories: {
       harassment: boolean,

@@ -10,6 +10,10 @@ export interface ModerationJobOptions {
     model?: string;
     idempotencyKey?: string;
     skipLock?: boolean;
+    unscanned?: boolean;
+    changedSince?: string;
+    reportedSince?: string;
+    fullReindex?: boolean;
 }
 export declare class ModerationPipeline {
     private gamedinClient;
@@ -21,7 +25,7 @@ export declare class ModerationPipeline {
      */
     runJob(options?: ModerationJobOptions): Promise<ModerationOutput>;
     /**
-     * Process moderation items through the provider
+     * Process moderation items through rule engine and optionally AI provider
      */
     private processItems;
     /**

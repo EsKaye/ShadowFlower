@@ -4,6 +4,49 @@
 export type ModerationItemType = 'post' | 'comment' | 'profile' | 'message' | 'image' | 'video';
 export type ModerationSeverity = 'low' | 'medium' | 'high' | 'critical';
 export type ModerationAction = 'approve' | 'review' | 'escalate' | 'remove' | 'suspend';
+/**
+ * Rule-based moderation categories
+ */
+export type RuleCategory = 'offensive_language' | 'hate_abuse' | 'harassment' | 'nsfw_text' | 'spam_promo' | 'impersonation_signals' | 'suspicious_links' | 'other';
+/**
+ * Rule matching types
+ */
+export type RuleType = 'exact' | 'phrase' | 'case_insensitive' | 'normalized' | 'regex';
+/**
+ * Moderation rule definition
+ */
+export interface ModerationRule {
+    id: string;
+    category: RuleCategory;
+    type: RuleType;
+    pattern: string;
+    severity: ModerationSeverity;
+    weight: number;
+    enabled: boolean;
+    description?: string;
+}
+/**
+ * Rule match result
+ */
+export interface RuleMatch {
+    ruleId: string;
+    category: RuleCategory;
+    severity: ModerationSeverity;
+    weight: number;
+    matchedText: string;
+}
+/**
+ * Scan state fields (stored in GameDin database)
+ */
+export interface ScanState {
+    lastScannedAt?: string;
+    scanVersion?: string;
+    ruleMatchCount?: number;
+    matchedCategories?: RuleCategory[];
+    matchedRuleIds?: string[];
+    ruleRiskScore?: number;
+    aiReviewRequired?: boolean;
+}
 export interface ModerationItem {
     id: string;
     type: ModerationItemType;
@@ -37,6 +80,11 @@ export interface ModerationResult {
     aiEscalateToAdmin: boolean;
     aiProvider: string;
     aiModel: string;
+    matchedRules: RuleMatch[];
+    ruleRiskScore: number;
+    matchedCategories: RuleCategory[];
+    ruleMatchCount: number;
+    aiReviewRequired: boolean;
     processedAt: string;
     severity: ModerationSeverity;
     categories: {
