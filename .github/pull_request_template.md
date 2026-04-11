@@ -1,22 +1,10 @@
-## Summary
-<!-- Provide a brief summary of the changes -->
+### Summary
+- 
 
-## Changes
-<!-- List the specific changes made -->
+### Alignment
+- Guardian branch: 
+- Matches council intent docs? (Y/N)
 
-## Test Plan
-<!-- Describe how you tested these changes -->
-
-## Checklist
-- [ ] Code follows project style guidelines
-- [ ] Self-review completed
-- [ ] Code is commented where necessary
-- [ ] Documentation updated if needed
-- [ ] No breaking changes introduced
-
-## Related Issues
-<!-- Link any related issues here -->
-
-## Screenshots (if applicable)
-<!-- Add screenshots for UI changes -->
-
+### Checks
+- [ ] CI passed
+- [ ] Docs updated
