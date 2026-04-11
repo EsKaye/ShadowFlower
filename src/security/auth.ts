@@ -115,15 +115,13 @@ export function rateLimit(options: {
 export function requestLogger(req: AuthenticatedRequest, res: VercelResponse, next: () => void): void {
   const start = Date.now();
   const requestId = req.requestId || generateRequestId();
-  
+
   console.log(`[${requestId}] ${req.method} ${req.url} - Started`);
 
-  const originalEnd = res.end;
-  res.end = function(this: VercelResponse, ...args: any[]) {
+  res.on('finish', () => {
     const duration = Date.now() - start;
     console.log(`[${requestId}] ${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
-    originalEnd.apply(this, args);
-  };
+  });
 
   next();
 }
@@ -135,14 +133,14 @@ export function errorHandler(
   error: Error,
   req: AuthenticatedRequest,
   res: VercelResponse,
-  next: (err?: Error) => void
+  _next: (err?: Error) => void
 ): void {
   const requestId = req.requestId || generateRequestId();
   
   console.error(`[${requestId}] Error:`, error);
 
   // Don't expose internal error details in production
-  const isDevelopment = process.env.NODE_ENV === 'development';
+  const isDevelopment = process.env['NODE_ENV'] === 'development';
   
   res.status(500).json({
     error: 'Internal Server Error',

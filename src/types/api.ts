@@ -2,7 +2,7 @@
  * API request/response types for ShadowFlower service
  */
 
-import { ModerationInput, ModerationOutput } from './moderation';
+import { ModerationOutput } from './moderation';
 
 export interface HealthResponse {
   status: 'healthy' | 'unhealthy';

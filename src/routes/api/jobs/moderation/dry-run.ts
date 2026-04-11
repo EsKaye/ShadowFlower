@@ -2,12 +2,12 @@
  * Dry-run moderation job API endpoint
  */
 
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { ModerationJobRequest, ModerationJobResponse } from '../../../types';
-import { ModerationPipeline } from '../../../jobs/moderation-pipeline';
-import { GameDinClient } from '../../../lib/gamedin-client';
-import { getConfig } from '../../../config';
-import { requireAuth, AuthenticatedRequest } from '../../../security/auth';
+import { VercelResponse } from '@vercel/node';
+import { ModerationJobRequest, ModerationJobResponse } from '../../../../types';
+import { ModerationPipeline } from '../../../../jobs/moderation-pipeline';
+import { GameDinClient } from '../../../../lib/gamedin-client';
+import { getConfig } from '../../../../config';
+import { requireAuth, AuthenticatedRequest } from '../../../../security/auth';
 
 async function handler(req: AuthenticatedRequest, res: VercelResponse): Promise<void> {
   if (req.method !== 'POST') {

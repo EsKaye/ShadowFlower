@@ -20,7 +20,12 @@ export class GameDinClient {
     this.client = axios.create({
       baseURL: config.baseUrl,
       timeout: config.timeout || 10000,
-      headers: this.getAuthHeaders(),
+    });
+
+    // Set headers separately to avoid type issues
+    const authHeaders = this.getAuthHeaders();
+    Object.entries(authHeaders).forEach(([key, value]) => {
+      this.client.defaults.headers.common[key] = value;
     });
 
     // Add response interceptor for error handling
@@ -122,6 +127,11 @@ export class GameDinClient {
     this.config = { ...this.config, ...newConfig };
     this.client.defaults.baseURL = this.config.baseUrl;
     this.client.defaults.timeout = this.config.timeout || 10000;
-    this.client.defaults.headers = this.getAuthHeaders();
+
+    // Set headers separately to avoid type issues
+    const authHeaders = this.getAuthHeaders();
+    Object.entries(authHeaders).forEach(([key, value]) => {
+      this.client.defaults.headers.common[key] = value;
+    });
   }
 }

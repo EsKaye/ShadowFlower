@@ -36,7 +36,7 @@ export default async function handler(_req: VercelRequest, res: VercelResponse):
     const response: HealthResponse = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      version: process.env.npm_package_version || '1.0.0',
+      version: process.env['npm_package_version'] || '1.0.0',
       uptime,
       services: {
         gamedin: gamedinStatus,
@@ -52,7 +52,7 @@ export default async function handler(_req: VercelRequest, res: VercelResponse):
     const response: HealthResponse = {
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
-      version: process.env.npm_package_version || '1.0.0',
+      version: process.env['npm_package_version'] || '1.0.0',
       uptime: process.uptime ? Math.floor(process.uptime()) : 0,
       services: {
         gamedin: 'disconnected',

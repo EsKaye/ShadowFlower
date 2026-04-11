@@ -9,10 +9,16 @@ function getEnvironmentConfig(): EnvironmentConfig {
     gamedinBaseUrl: process.env['GAMEDIN_BASE_URL'] || '',
     shadowflowerApiKey: process.env['SHADOWFLOWER_API_KEY'] || '',
     gamedinShadowflowerApiKey: process.env['GAMEDIN_SHADOWFLOWER_API_KEY'] || '',
-    geminiApiKey: process.env['GEMINI_API_KEY'],
     nodeEnv: (process.env['NODE_ENV'] as 'development' | 'production') || 'development',
-    port: process.env['PORT'] ? parseInt(process.env['PORT'], 10) : undefined,
   };
+
+  // Conditionally add optional properties
+  if (process.env['GEMINI_API_KEY']) {
+    config.geminiApiKey = process.env['GEMINI_API_KEY'];
+  }
+  if (process.env['PORT']) {
+    config.port = parseInt(process.env['PORT'], 10);
+  }
 
   // Validate required environment variables
   const requiredVars = ['gamedinBaseUrl', 'shadowflowerApiKey', 'gamedinShadowflowerApiKey'];
