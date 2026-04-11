@@ -68,6 +68,16 @@
 **Fix**: Added comprehensive environment validation on startup
 **Prevention Rule**: Validate all required environment variables at startup
 
+### Problem: Vercel Deployment Structure Incorrect
+**Root Cause**: API routes placed in `src/routes/api/` with complex rewrites instead of using Vercel's expected `api/` directory structure
+**Fix**: Moved API routes to root `api/` directory and removed incorrect rewrites from vercel.json
+**Prevention Rule**: Follow platform-specific directory structures and conventions, avoid custom routing when platform conventions exist
+
+### Problem: CORS Wildcard Origin Security Vulnerability
+**Root Cause**: CORS configured with wildcard origin `*` allowing unrestricted access
+**Fix**: Implemented configurable ALLOWED_ORIGIN environment variable with safe default
+**Prevention Rule**: Never use wildcard CORS origins in production, always restrict to specific domains
+
 ## Testing Lessons
 
 ### Problem: Missing Integration Tests
@@ -103,6 +113,11 @@
 **Root Cause**: Assumed knowledge about local development setup
 **Fix**: Added comprehensive setup instructions in README
 **Prevention Rule**: Never assume user knowledge, document everything
+
+### Problem: Production-Ready Claims Without Validation
+**Root Cause**: Documentation claimed production readiness when service was untested and unvalidated
+**Fix**: Removed production-ready claims and added honest status section with limitations
+**Prevention Rule**: Never claim production readiness without testing and validation, always document actual state
 
 ## Future Prevention Rules
 
