@@ -4,10 +4,10 @@
  * Supports GET for Vercel cron execution and POST for manual testing
  */
 
-import { ModerationPipeline } from '../../lib/jobs/moderation-pipeline';
-import { GameDinClient } from '../../lib/gamedin-client';
-import { getConfig } from '../../lib/config';
-import { requireCronAuth } from '../../lib/security/auth';
+const { ModerationPipeline } = require('../../lib/jobs/moderation-pipeline');
+const { GameDinClient } = require('../../lib/gamedin-client');
+const { getConfig } = require('../../lib/config');
+const { requireCronAuth } = require('../../lib/security/auth');
 
 async function handler(req, res) {
   // Support GET for Vercel cron execution and POST for manual testing
@@ -119,6 +119,6 @@ async function handler(req, res) {
 }
 
 // Apply cron-safe auth middleware for protection
-// GET requests: validates CRON_SECRET from query parameter
+// GET requests: validates CRON_SECRET from Authorization: Bearer header
 // POST requests: validates API key from header
-export default requireCronAuth(handler);
+module.exports = requireCronAuth(handler);
