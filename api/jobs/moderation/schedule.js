@@ -4,10 +4,10 @@
  * Supports GET for Vercel cron execution and POST for manual testing
  */
 
-const { ModerationPipeline } = require('../../lib/jobs/moderation-pipeline');
+const { ModerationPipeline } = require('../../jobs/moderation-pipeline');
 const { GameDinClient } = require('../../lib/gamedin-client');
-const { getConfig } = require('../../lib/config');
-const { requireCronAuth } = require('../../lib/security/auth');
+const { getConfig } = require('../../config');
+const { requireCronAuth } = require('../../security/auth');
 
 async function handler(req, res) {
   // Support GET for Vercel cron execution and POST for manual testing
