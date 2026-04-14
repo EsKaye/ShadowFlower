@@ -5,8 +5,7 @@
   "env": {
     "NODE_ENV": "production",
     "DRY_RUN_DEFAULT": "true",
-    "DEFAULT_BATCH_SIZE": "5",
-    "CRON_SECRET": "@cron_secret"
+    "DEFAULT_BATCH_SIZE": "5"
   },
   "rewrites": [
     {
