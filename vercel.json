@@ -28,7 +28,7 @@
   "crons": [
     {
       "path": "/api/jobs/moderation/schedule",
-      "schedule": "0 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
