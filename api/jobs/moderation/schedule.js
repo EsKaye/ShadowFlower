@@ -4,6 +4,8 @@
  * Supports GET for Vercel cron execution and POST for manual testing
  */
 
+import { requireCronAuth } from '../../security/auth';
+
 async function handler(req, res) {
   // Support GET for Vercel cron execution and POST for manual testing
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -12,6 +14,7 @@ async function handler(req, res) {
       error: 'Method Not Allowed',
       message: 'Only GET and POST requests are supported',
       timestamp: new Date().toISOString(),
+      requestId: req.requestId,
     });
     return;
   }
@@ -20,12 +23,13 @@ async function handler(req, res) {
     // Minimal test response to diagnose runtime issues
     const response = {
       success: true,
-      message: 'Cron route is working',
+      message: 'Cron route is working with auth',
       method: req.method,
+      authenticated: req.authenticated,
       timestamp: new Date().toISOString(),
     };
 
-    console.log(`[Scheduler] Test handler executed: ${req.method}`);
+    console.log(`[Scheduler] Test handler executed: ${req.method}, authenticated: ${req.authenticated}`);
 
     res.status(200).json(response);
 
@@ -42,4 +46,4 @@ async function handler(req, res) {
   }
 }
 
-export default handler;
+export default requireCronAuth(handler);
