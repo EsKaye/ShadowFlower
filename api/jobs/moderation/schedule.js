@@ -4,9 +4,9 @@
  * Supports GET for Vercel cron execution and POST for manual testing
  */
 
-import { ModerationPipeline } from '../../jobs/moderation-pipeline';
-import { GameDinClient } from '../../lib/gamedin-client';
-import { getConfig } from '../../config';
+import { ModerationPipeline } from '../../../dist/jobs/moderation-pipeline';
+import { GameDinClient } from '../../../dist/lib/gamedin-client';
+import { getConfig } from '../../../dist/config';
 
 // Inline auth middleware to avoid import issues
 function requireCronAuth(handler) {
