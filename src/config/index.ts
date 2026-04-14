@@ -10,10 +10,6 @@ import { ServiceConfig, EnvironmentConfig, ModerationConfig } from '../types';
  */
 function validateSecretStrength(secret: string, secretName: string): void {
   const minLength = 32;
-  const hasUpperCase = /[A-Z]/.test(secret);
-  const hasLowerCase = /[a-z]/.test(secret);
-  const hasNumbers = /\d/.test(secret);
-  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(secret);
 
   if (secret.length < minLength) {
     throw new Error(
@@ -21,9 +17,17 @@ function validateSecretStrength(secret: string, secretName: string): void {
     );
   }
 
-  if (!hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecialChar) {
+  // Check for reasonable complexity (at least two of: lowercase, uppercase, numbers, special chars)
+  const hasUpperCase = /[A-Z]/.test(secret);
+  const hasLowerCase = /[a-z]/.test(secret);
+  const hasNumbers = /\d/.test(secret);
+  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(secret);
+
+  const complexityScore = [hasUpperCase, hasLowerCase, hasNumbers, hasSpecialChar].filter(Boolean).length;
+
+  if (complexityScore < 2) {
     throw new Error(
-      `${secretName} must contain uppercase, lowercase, numbers, and special characters`
+      `${secretName} must have at least two of: uppercase, lowercase, numbers, or special characters`
     );
   }
 }
