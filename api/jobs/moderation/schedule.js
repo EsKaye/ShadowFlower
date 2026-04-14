@@ -4,7 +4,7 @@
  * Supports GET for Vercel cron execution and POST for manual testing
  */
 
-import { requireCronAuth } from '../../security/auth';
+import { requireCronAuth } from '../../src/security/auth';
 
 async function handler(req, res) {
   // Support GET for Vercel cron execution and POST for manual testing
