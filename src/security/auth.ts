@@ -98,6 +98,101 @@ export function validateApiKey(request: VercelRequest): boolean {
 }
 
 /**
+ * Validate cron secret from request header
+ * Used for Vercel cron authentication on GET requests
+ * Vercel sends Authorization: Bearer <CRON_SECRET> when CRON_SECRET is configured
+ */
+export function validateCronSecret(request: VercelRequest): boolean {
+  const cronSecret = process.env['CRON_SECRET'];
+  if (!cronSecret) {
+    return false;
+  }
+
+  const authHeader = request.headers['authorization'] as string;
+  if (!authHeader) {
+    return false;
+  }
+
+  // Vercel cron sends: Authorization: Bearer <CRON_SECRET>
+  const expectedAuth = `Bearer ${cronSecret}`;
+  return authHeader === expectedAuth;
+}
+
+/**
+ * Authentication middleware for cron route
+ * GET requests: validates CRON_SECRET from Authorization: Bearer header (Vercel native)
+ * POST requests: validates API key from header
+ */
+export function requireCronAuth(
+  handler: (req: AuthenticatedRequest, res: VercelResponse) => Promise<void> | void
+) {
+  return async (req: AuthenticatedRequest, res: VercelResponse): Promise<void> => {
+    const requestId = generateRequestId();
+    req.requestId = requestId;
+
+    const clientId = (req.headers['x-forwarded-for'] as string) ||
+                     (req.headers['x-real-ip'] as string) ||
+                     'unknown';
+
+    // Skip CORS for cron GET requests (no origin header)
+    if (req.method !== 'GET') {
+      // Apply CORS headers for non-GET requests
+      if (!applyCorsHeaders(req, res)) {
+        const origin = req.headers['origin'] as string;
+        if (origin && req.url) {
+          logCorsRejected({ requestId, origin, route: req.url });
+        }
+        res.status(403).json({
+          error: 'Forbidden',
+          message: 'Origin not allowed',
+          timestamp: new Date().toISOString(),
+          requestId,
+        });
+        return;
+      }
+
+      // Handle preflight requests
+      if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+      }
+    }
+
+    // Validate auth based on method
+    if (req.method === 'GET') {
+      // GET requests: validate CRON_SECRET from Authorization: Bearer header (Vercel native)
+      if (!validateCronSecret(req)) {
+        logAuthFailure({ requestId, clientId, reason: 'Invalid cron secret' });
+        res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Valid cron secret required',
+          timestamp: new Date().toISOString(),
+          requestId,
+        });
+        return;
+      }
+      logAuthSuccess({ requestId, clientId });
+    } else if (req.method === 'POST') {
+      // POST requests: validate API key from header
+      if (!validateApiKey(req)) {
+        logAuthFailure({ requestId, clientId, reason: 'Invalid API key' });
+        res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Valid API key required',
+          timestamp: new Date().toISOString(),
+          requestId,
+        });
+        return;
+      }
+      logAuthSuccess({ requestId, clientId });
+    }
+
+    req.authenticated = true;
+    await handler(req, res);
+  };
+}
+
+/**
  * Authentication middleware for protected routes
  */
 export function requireAuth(

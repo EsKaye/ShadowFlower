@@ -168,7 +168,8 @@ ShadowFlower has undergone comprehensive security hardening with the following m
 All routes are explicitly classified by access level:
 
 - **Public**: `/api/health` - Minimal operational status only
-- **Protected**: `/api/jobs/moderation/run`, `/api/jobs/moderation/dry-run`, `/api/jobs/moderation/schedule` - Require `SHADOWFLOWER_API_KEY`
+- **Protected**: `/api/jobs/moderation/run`, `/api/jobs/moderation/dry-run`, `/api/jobs/moderation/rescan`, `/api/jobs/moderation/reindex` - Require `SHADOWFLOWER_API_KEY`
+- **Cron-Protected**: `/api/jobs/moderation/schedule` - Requires `CRON_SECRET` via `Authorization: Bearer` header for GET (Vercel cron) or `SHADOWFLOWER_API_KEY` for POST (manual testing)
 - **Admin**: Reserved endpoints - Require `SHADOWFLOWER_ADMIN_KEY` (returns 404 if invalid)
 
 ### HMAC Signature Verification
