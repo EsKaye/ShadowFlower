@@ -34,9 +34,9 @@ function validateSecretStrength(secret: string, secretName: string): void {
 
 function getEnvironmentConfig(): EnvironmentConfig {
   const config: EnvironmentConfig = {
-    gamedinBaseUrl: process.env['GAMEDIN_BASE_URL'] || '',
+    gamedinBaseUrl: process.env['GAMEDIN_BASE_URL'] || 'https://gamedin.xyz',
     shadowflowerApiKey: process.env['SHADOWFLOWER_API_KEY'] || '',
-    gamedinShadowflowerApiKey: process.env['GAMEDIN_SHADOWFLOWER_API_KEY'] || '',
+    shadowflowerSigningSecret: process.env['SHADOWFLOWER_SIGNING_SECRET'] || '',
     nodeEnv: (process.env['NODE_ENV'] as 'development' | 'production') || 'development',
   };
 
@@ -44,27 +44,35 @@ function getEnvironmentConfig(): EnvironmentConfig {
   if (process.env['NVIDIA_API_KEY']) {
     config.nvidiaApiKey = process.env['NVIDIA_API_KEY'];
   }
+
+  if (process.env['ALLOWED_ORIGIN']) {
+    config.allowedOrigin = process.env['ALLOWED_ORIGIN'];
+  }
+
+  if (process.env['UPSTASH_REDIS_REST_URL']) {
+    config.upstashRedisRestUrl = process.env['UPSTASH_REDIS_REST_URL'];
+  }
+
+  if (process.env['UPSTASH_REDIS_REST_TOKEN']) {
+    config.upstashRedisRestToken = process.env['UPSTASH_REDIS_REST_TOKEN'];
+  }
+
+  if (process.env['GEMINI_API_KEY']) {
+    config.geminiApiKey = process.env['GEMINI_API_KEY'];
+  }
+
   if (process.env['ENABLE_DISCORD_INTERACTIONS']) {
     config.enableDiscordInteractions = process.env['ENABLE_DISCORD_INTERACTIONS'] === 'true';
   }
   if (process.env['PORT']) {
     config.port = parseInt(process.env['PORT'], 10);
   }
-  if (process.env['UPSTASH_REDIS_REST_URL']) {
-    config.upstashRedisRestUrl = process.env['UPSTASH_REDIS_REST_URL'];
-  }
-  if (process.env['UPSTASH_REDIS_REST_TOKEN']) {
-    config.upstashRedisRestToken = process.env['UPSTASH_REDIS_REST_TOKEN'];
-  }
   if (process.env['GAMEDIN_SIGNING_SECRET']) {
     config.gamedinSigningSecret = process.env['GAMEDIN_SIGNING_SECRET'];
   }
-  if (process.env['SHADOWFLOWER_SIGNING_SECRET']) {
-    config.shadowflowerSigningSecret = process.env['SHADOWFLOWER_SIGNING_SECRET'];
-  }
 
   // Validate required environment variables
-  const requiredVars = ['gamedinBaseUrl', 'shadowflowerApiKey', 'gamedinShadowflowerApiKey'];
+  const requiredVars = ['gamedinBaseUrl', 'shadowflowerApiKey', 'shadowflowerSigningSecret'];
   const missingVars = requiredVars.filter(varName => !config[varName as keyof EnvironmentConfig]);
 
   if (missingVars.length > 0) {
@@ -74,25 +82,13 @@ function getEnvironmentConfig(): EnvironmentConfig {
   // Validate secret strength
   try {
     validateSecretStrength(config.shadowflowerApiKey, 'SHADOWFLOWER_API_KEY');
-    validateSecretStrength(config.gamedinShadowflowerApiKey, 'GAMEDIN_SHADOWFLOWER_API_KEY');
+    validateSecretStrength(config.shadowflowerSigningSecret, 'SHADOWFLOWER_SIGNING_SECRET');
   } catch (error) {
     if (process.env['NODE_ENV'] === 'production') {
       throw error;
     }
     // In development, warn but don't fail
     console.warn(`Secret validation warning: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-
-  // Validate optional signing secret if configured
-  if (process.env['SHADOWFLOWER_SIGNING_SECRET']) {
-    try {
-      validateSecretStrength(process.env['SHADOWFLOWER_SIGNING_SECRET'], 'SHADOWFLOWER_SIGNING_SECRET');
-    } catch (error) {
-      if (process.env['NODE_ENV'] === 'production') {
-        throw error;
-      }
-      console.warn(`Secret validation warning: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
   }
 
   // Validate optional admin key if configured

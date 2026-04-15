@@ -284,8 +284,10 @@ For production-grade rate limiting, implement distributed rate limiting with per
 ```bash
 GAMEDIN_BASE_URL=https://api.gamedin.xyz
 SHADOWFLOWER_API_KEY=your_shadowflower_api_key
+SHADOWFLOWER_SIGNING_SECRET=your_shadowflower_signing_secret_minimum_32_characters
 GAMEDIN_SHADOWFLOWER_API_KEY=your_gamedin_shadowflower_api_key
 ALLOWED_ORIGIN=http://localhost:3000
+CRON_SECRET=your_cron_secret_minimum_32_characters
 ```
 
 ### Optional
@@ -680,6 +682,23 @@ On Vercel Hobby tier:
 8. **Private service posture** - root returns 404, no public UI
 9. **Admin gate** - use SHADOWFLOWER_ADMIN_KEY for admin endpoints
 10. **Never expose secrets** in logs, errors, or responses
+
+### Secret Rotation
+
+**CRITICAL: SHADOWFLOWER_SIGNING_SECRET Rotation Required**
+
+The `SHADOWFLOWER_SIGNING_SECRET` is used for HMAC signature authentication with GameDin. If this secret was ever exposed in source code (as it was during debugging), it must be rotated immediately.
+
+**Rotation Steps:**
+
+1. **Generate a new secret**: Create a cryptographically secure random secret (minimum 32 characters, high entropy)
+2. **Update Vercel**: Set the new `SHADOWFLOWER_SIGNING_SECRET` in Vercel production environment variables
+3. **Update GameDin**: Coordinate with GameDin team to update the corresponding secret on their side
+4. **Redeploy ShadowFlower**: Deploy to pick up the new environment variable
+5. **Validate connectivity**: Test `/api/health` endpoint to confirm GameDin connectivity works
+6. **Monitor**: Watch for any authentication failures after rotation
+
+**Important**: The secret must be rotated on both ShadowFlower and GameDin simultaneously to maintain authentication alignment.
 
 ### Current Limitations
 
